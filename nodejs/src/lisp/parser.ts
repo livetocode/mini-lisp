@@ -1,3 +1,4 @@
+import { LispException, LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 import { Token, tokenize } from "./tokenizer";
 import { Cons, Expr, Nil, NumberAtom, StringAtom, SymbolAtom } from "./types";
 
@@ -11,7 +12,7 @@ function parseToken(token: Token): Expr {
         case 'string':
             return new StringAtom(token.value);
         default:
-            throw new Error(`Unexpected token ${token.type} with value ${token.value}`);
+            throw new LispException(`Unexpected token ${token.type} with value ${token.value}`);
     }
 }
 
@@ -60,13 +61,16 @@ class StackFrame {
 
     toSingleExpr() {
         if (this.expressions.length  > 1) {
-            throw new Error('Expected to have a single expression');
+            throw new LispSyntaxException('Expected to have a single expression');
         } else if (this.expressions.length === 1) {
             const val = this.expressions[0];
             if (val.type === 'expr') {
                 return val.value;
             }
-            throw new Error(`Expected single expression but had ${val.type}: ${val.value}`);
+            if (val.value === 'quote') {
+                throw new LispUnterminatedExpressionException('Expected an expression after a quote');
+            }
+            throw new LispSyntaxException(`Expected single expression but had symbol ${val.type}: ${val.value}`);
         }
         return Nil.instance;
     }
@@ -75,24 +79,21 @@ class StackFrame {
         // special case of an assoc:
         // (1 . 2)
         // (1 2 . 3)
-        if (this.expressions.length >= 3 && 
-            this.expressions[this.expressions.length - 1].type === 'expr' &&
-            this.getSymb(this.expressions.length-2) === 'assoc' &&
-            this.expressions[this.expressions.length - 3].type === 'expr') {
-            const last = this.getExpr(this.expressions.length - 1);
-            if (last) {
-                const listItems = this.expressions.slice(0, -2).filter((x => x.type === 'expr')).map(x => x.value as Expr);
-                const result = Cons.fromArray(listItems, last);
+        if (this.expressions.length >= 3) {
+            const a = this.getExpr(this.expressions.length - 3);
+            const symb = this.getSymb(this.expressions.length - 2);
+            const b = this.getExpr(this.expressions.length - 1);
+            if (a && (symb === 'assoc') && b) {
+                const listItems = this.getExprSlice(0, -2);
+                const result = Cons.fromArray(listItems, b);
                 return result;
-            } else {
-                throw new Error('Expected to have 2 expressions for an assoc');
             }
-        }
-        const expressions = this.expressions.filter(x => x.type === 'expr').map(x => x.value as Expr);
+        }  
+        const expressions = this.getExprSlice();
         return Cons.fromArray(expressions);
     }    
     
-    getCurrentSymbol() : 'quote' | 'assoc' | undefined {
+    private getCurrentSymbol() : 'quote' | 'assoc' | undefined {
         return this.getSymb(this.expressions.length - 1);
     }
 
@@ -111,6 +112,19 @@ class StackFrame {
         }
         return undefined;
     }
+
+    private getExprSlice(from?: number, to?: number): Expr[] {
+        const slice = this.expressions.slice(from, to);
+        const result: Expr[] = [];
+        for (const e of slice) {
+            if (e.type === 'expr') {
+                result.push(e.value);
+            } else {
+                throw new LispSyntaxException('Unexpected token');
+            }
+        }
+        return result;
+    }
 }
 
 export function parse(text: string) {
@@ -128,11 +142,11 @@ export function parse(text: string) {
                     frame = previousFrame;
                     frame.addExpr(list);
                 } else {
-                    throw new Error('Found closing pasrenthesis without matching opening parenthesis');
+                    throw new LispSyntaxException('Found closing pasrenthesis without matching opening parenthesis');
                 }
             } else if (token.value === '.') {
                 if (frame.isEmpty()) {
-                    throw new Error('Expr required before a dot');
+                    throw new LispSyntaxException('Expression required before a dot');
                 }
                 frame.addSymbol('assoc');
             } else if (token.value === "'") {
@@ -142,11 +156,15 @@ export function parse(text: string) {
             }
         } else {
             if (!frame.isEmpty() && stack.length === 0) {
-                throw new Error('You did not open a parenthesis');
+                // TODO: replace with custom Error classes
+                throw new LispSyntaxException('Expected a single expression');
             }
             const expr = parseToken(token);
             frame.addExpr(expr);
         }
+    }
+    if (stack.length > 0) {
+        throw new LispUnterminatedExpressionException('Unbalanced list expression');
     }
     return frame.toSingleExpr();
 }

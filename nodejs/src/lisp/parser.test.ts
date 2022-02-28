@@ -1,3 +1,4 @@
+import { LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 import { parse } from "./parser";
 import { Cons, FloatAtom, IntegerAtom, Nil, StringAtom, SymbolAtom } from "./types";
 
@@ -62,6 +63,22 @@ describe('parser', () => {
             expect(atom).toBeInstanceOf(StringAtom);
             expect((atom as StringAtom).getValue()).toBe('abc');
         });
+        test('string with white space and inner quotes', () => {
+            const atom = parse('"Hello \\"World\\"!\\nA second\\tline"');
+            expect(atom.isString()).toBeTruthy();
+            expect(atom).toBeInstanceOf(StringAtom);
+            expect((atom as StringAtom).getValue()).toBe('Hello "World"!\nA second\tline');
+            expect(atom.toString()).toBe('"Hello \\"World\\"!\\nA second\\tline"');
+        });
+        test('multiple expressions without parenthesis should fail', () => {
+            expect(() => parse('1 2 3')).toThrow(LispSyntaxException);
+        });    
+        test('quote without expression', () => {
+            expect(() => parse("'")).toThrow(LispUnterminatedExpressionException);
+        });    
+        test('assoc without right expression', () => {
+            expect(() => parse('(1 .)')).toThrow(LispSyntaxException);
+        });    
         describe('symbols', () => {
             const identifiers = [
                 ['a'],
@@ -207,17 +224,34 @@ describe('parser', () => {
             expect(second.cdr).toEqual(new IntegerAtom(3));
             expect(first.toArray()).toEqual([new IntegerAtom(1), new IntegerAtom(2), new IntegerAtom(3)]);
         });
+        test('no left expr in assoc', () => {
+            expect(() => parse('(. 2)')).toThrow(LispSyntaxException);
+        });    
+        test('closed list without opening parenthesis', () => {
+            expect(() => parse('1)')).toThrow(LispSyntaxException);
+        });    
+        test('unbalanced list', () => {
+            expect(() => parse('(1 2 (3 4)')).toThrow(LispSyntaxException);
+        });    
+        test('multiple expressions outside a list are not allowed', () => {
+            expect(() => parse('1 2 3')).toThrow(LispSyntaxException);
+            expect(() => parse('(1 2 3')).toThrow(LispSyntaxException);
+        });    
     });
     describe('print expressions', () => {
         const expressions = [
+            ["'\n(+\n 2 2)\n", '(quote (+ 2 2))'],
             ['', 'nil'],
             ['()', 'nil'],
             ["'()", 'nil'],
             ['(+ 2 2)'],
             ["'(+ 2 2)", '(quote (+ 2 2))'],
+            ["'\n(+\n 2 2)\n", '(quote (+ 2 2))'],
             ['(cons "foo" ("bar"))'],
             ['(1 2 |foo bar| 3.14 "abc")'],
             ['(+ 2 (+ 3 3) 4)'],
+            ['(+ 2 \n(+ 3 \n3)\n 4)', '(+ 2 (+ 3 3) 4)'],
+            ['(1 2\n3)', '(1 2 3)']
         ];
         for (const [expr, expected] of expressions) {
             test(expr, () => {
