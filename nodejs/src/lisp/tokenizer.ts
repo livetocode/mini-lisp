@@ -28,7 +28,15 @@ export type IdentifierToken = {
     to: CursorPosition;
 }
 
-export type Token = SymbolToken | NumberToken | StringToken | IdentifierToken;
+export type CommentToken = {
+    type: 'comment';
+    value: string;
+    from: CursorPosition;
+    to: CursorPosition;
+}
+
+
+export type Token = SymbolToken | NumberToken | StringToken | IdentifierToken | CommentToken;
 
 function isCRLF(char: string) {
     return char === '\n' || char === '\r'
@@ -128,6 +136,7 @@ export class Cursor {
         return {
             from,
             to: this.currentPos(),
+            str: this.text.slice(from.index, this.index),
         };    
     }
 }
@@ -265,8 +274,8 @@ export function* tokenize(text: string) : Generator<Token> {
         if (c === undefined) {
             break;
         } else if (c === ';') {
-            // skip comments
-            cursor.skipToEndOfLine();
+            const { str, from, to } = cursor.skipToEndOfLine();
+            yield { type: 'comment', value: str, from, to }
         } else if (['(', ')', '.', "'"].includes(c)) {
             const from = cursor.currentPos();
             cursor.next();

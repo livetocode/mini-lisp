@@ -18,13 +18,19 @@ describe('tokenize', () => {
             expect(tokToList("  \n  \r  \t ")).toEqual([]);
         });    
         test('comment only', () => {
-            expect(tokToList("  ; some comment")).toEqual([]);
+            expect(tokToList("  ; some comment")).toEqual([{type: 'comment', value: '; some comment'}]);
         });    
         test('simple int with comment after', () => {
-            expect(tokToList("1 ; some comment")).toEqual([{type: 'number', value: '1'}]);
+            expect(tokToList("1 ; some comment")).toEqual([
+                {type: 'number', value: '1'},
+                {type: 'comment', value: '; some comment'},
+            ]);
         });    
         test('simple int with comment before', () => {
-            expect(tokToList("; some comment\n1")).toEqual([{type: 'number', value: '1'}]);
+            expect(tokToList("; some comment\n1")).toEqual([
+                {type: 'comment', value: '; some comment'},
+                {type: 'number', value: '1'},
+            ]);
         });        
     });
     describe('integers', () => {
@@ -205,6 +211,7 @@ describe('tokenize', () => {
         // }
         // console.log(code.join('\n'));
   
+        expect(tokens.shift()).toEqual({"type":"comment","value":";;; This is a sample script","from":{"index":0,"line":1,"col":1},"to":{"index":27,"line":2,"col":0}});
         expect(tokens.shift()).toEqual({"type":"symbol","value":"(","from":{"index":28,"line":2,"col":1},"to":{"index":28,"line":2,"col":1}});
         expect(tokens.shift()).toEqual({"type":"identifier","value":"progn","from":{"index":29,"line":2,"col":2},"to":{"index":33,"line":2,"col":6}});
         expect(tokens.shift()).toEqual({"type":"symbol","value":"(","from":{"index":39,"line":3,"col":5},"to":{"index":39,"line":3,"col":5}});
@@ -242,6 +249,27 @@ describe('tokenize', () => {
         expect(tokens.shift()).toEqual({"type":"identifier","value":"print","from":{"index":177,"line":11,"col":6},"to":{"index":181,"line":11,"col":10}});
         expect(tokens.shift()).toEqual({"type":"string","value":"Hello \"World\"!\nAnother line","from":{"index":183,"line":11,"col":12},"to":{"index":214,"line":11,"col":43}});
         expect(tokens.shift()).toEqual({"type":"symbol","value":")","from":{"index":215,"line":11,"col":44},"to":{"index":215,"line":11,"col":44}});
-        expect(tokens.shift()).toEqual({"type":"symbol","value":")","from":{"index":217,"line":12,"col":1},"to":{"index":217,"line":12,"col":1}});  
-    })
+        expect(tokens.shift()).toEqual({"type":"symbol","value":")","from":{"index":217,"line":12,"col":1},"to":{"index":217,"line":12,"col":1}});
+        expect(tokens.shift()).toEqual({"type":"comment","value":"; end of script","from":{"index":219,"line":12,"col":3},"to":{"index":234,"line":13,"col":0}});  
+    });
+    test('Cursor should skip cr/lf', () => {
+        const tokens: Token[] = [];
+        for (const token of tokenize('(+ 1 2\r\n   3 4)')) {
+            tokens.push(token);
+        }
+        // // Code generator for the assertions
+        // const code: string[] = []
+        // for (const tok of tokens) {
+        //     code.push(`expect(tokens.shift()).toEqual(${JSON.stringify(tok)});`);
+        // }
+        // console.log(code.join('\n'));
+
+        expect(tokens.shift()).toEqual({"type":"symbol","value":"(","from":{"index":0,"line":1,"col":1},"to":{"index":0,"line":1,"col":1}});
+        expect(tokens.shift()).toEqual({"type":"identifier","value":"+","from":{"index":1,"line":1,"col":2},"to":{"index":1,"line":1,"col":2}});
+        expect(tokens.shift()).toEqual({"type":"number","value":"1","from":{"index":3,"line":1,"col":4},"to":{"index":3,"line":1,"col":4}});
+        expect(tokens.shift()).toEqual({"type":"number","value":"2","from":{"index":5,"line":1,"col":6},"to":{"index":5,"line":1,"col":6}});
+        expect(tokens.shift()).toEqual({"type":"number","value":"3","from":{"index":11,"line":2,"col":4},"to":{"index":11,"line":2,"col":4}});
+        expect(tokens.shift()).toEqual({"type":"number","value":"4","from":{"index":13,"line":2,"col":6},"to":{"index":13,"line":2,"col":6}});
+        expect(tokens.shift()).toEqual({"type":"symbol","value":")","from":{"index":14,"line":2,"col":7},"to":{"index":14,"line":2,"col":7}});
+      })
 });

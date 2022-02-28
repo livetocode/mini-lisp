@@ -131,7 +131,9 @@ export function parse(text: string) {
     const stack: StackFrame[] = []
     let frame = new StackFrame();
     for (const token of tokenize(text)) {
-        if (token.type === 'symbol') {
+        if (token.type === 'comment') {
+            // ignore comments
+        } else if (token.type === 'symbol') {
             if (token.value === '(') {
                 stack.push(frame);
                 frame = new StackFrame();
