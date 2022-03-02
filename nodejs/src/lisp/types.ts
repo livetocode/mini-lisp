@@ -2,17 +2,20 @@
 Hierarchy:
 Expr
   |_Cons
+  |   |_QuotedExpr
   |_Atom
     |_Nil
     |_NumberAtom
     | |_IntegerAtom
     | |_FloatAtom
     |_BooleanAtom
-    |_StringAtom
-    |_SymbolAtom
+    |-TextAtom
+      |_StringAtom
+      |_SymbolAtom
 */
 
 
+// https://en.wikipedia.org/wiki/S-expression
 
 export abstract class Expr {
     abstract toString(): string;
@@ -27,6 +30,10 @@ export abstract class Expr {
 
     isNumber(): boolean {
         return false;
+    }
+
+    isText(): boolean {
+        return true;
     }
 
     isString(): boolean {
@@ -47,6 +54,10 @@ export abstract class Expr {
 
     isTrue(): boolean {
         return !this.isNil();
+    }
+
+    isQuote(): boolean {
+        return false;
     }
 }
 
@@ -156,12 +167,24 @@ export class FloatAtom extends NumberAtom {
     }
 }
 
-export class StringAtom extends Atom {
+export abstract class TextAtom extends Atom {
+    override isText(): boolean {
+        return true;
+    }
+    abstract getText(): string;
+}
+
+
+export class StringAtom extends TextAtom {
     constructor(private readonly value: string) {
         super();
     }
 
     override getValue() {
+        return this.value;
+    }
+
+    override getText(): string {
         return this.value;
     }
 
@@ -174,7 +197,7 @@ export class StringAtom extends Atom {
     }
 }
 
-export class SymbolAtom extends Atom {
+export class SymbolAtom extends TextAtom {
     constructor(private readonly value: string) {
         super();
     }
@@ -187,25 +210,26 @@ export class SymbolAtom extends Atom {
         return this.value;
     }
 
-    override toString(): string {
-        if (this.containsSpecialChar()) {
-            const escapedValue = this.value.replaceAll('|', '\\|')
-            return `|${escapedValue}|`;
-        }
+    override getText(): string {
         return this.value;
     }
 
-    private containsSpecialChar() {
-        for (let i = 0; i < this.value.length; i++) {
-            const c = this.value[i];
-            if ([' ', '|', '(', ')'].includes(c)) {
-                return true;
-            }
-        }
-        return false;
+    override isQuote(): boolean {
+        return this.value === SymbolAtom.quote.value;
     }
+
+    override toString(): string {
+        let result = this.value;
+        for (const char of [' ', '(', ')', '"', "'"]) {
+            result = result.replaceAll(char, '\\' + char);
+        }
+        return result;
+    }
+
+    static quote = new SymbolAtom('quote');
 }
 
+// https://en.wikipedia.org/wiki/Cons
 export class Cons extends Expr {
     constructor(public readonly car: Expr, public readonly cdr: Expr) {  
         super()
@@ -259,5 +283,18 @@ export class Cons extends Expr {
             result = new Cons(values[i], result);
         }
         return result;
+    }
+}
+
+export class QuotedExpr extends Cons {
+    override toString(): string {
+        if (this.car.isQuote() && this.cdr.isCons()) {
+            return `'${(this.cdr as Cons).car.toString()}`;
+        }
+        return super.toString();
+    }
+
+    static fromExpr(expr: Expr) {
+        return new QuotedExpr(SymbolAtom.quote, new Cons(expr, Nil.instance));
     }
 }

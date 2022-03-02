@@ -7,8 +7,37 @@ export type SymbolToken = {
     to: CursorPosition;
 }
 
-export type NumberToken = {
-    type: 'number';
+export type LParToken = {
+    type: 'lpar';
+    value: string;
+    from: CursorPosition;
+    to: CursorPosition;
+}
+
+export type RParToken = {
+    type: 'rpar';
+    value: string;
+    from: CursorPosition;
+    to: CursorPosition;
+}
+
+export type QuoteToken = {
+    type: 'quote';
+    value: string;
+    from: CursorPosition;
+    to: CursorPosition;
+}
+
+
+export type IntegerToken = {
+    type: 'integer';
+    value: string;
+    from: CursorPosition;
+    to: CursorPosition;
+}
+
+export type FloatToken = {
+    type: 'float';
     value: string;
     from: CursorPosition;
     to: CursorPosition;
@@ -16,13 +45,6 @@ export type NumberToken = {
 
 export type StringToken = {
     type: 'string';
-    value: string;
-    from: CursorPosition;
-    to: CursorPosition;
-}
-
-export type IdentifierToken = {
-    type: 'identifier';
     value: string;
     from: CursorPosition;
     to: CursorPosition;
@@ -36,14 +58,14 @@ export type CommentToken = {
 }
 
 
-export type Token = SymbolToken | NumberToken | StringToken | IdentifierToken | CommentToken;
+export type Token = SymbolToken | IntegerToken | FloatToken | StringToken | CommentToken | LParToken | RParToken | QuoteToken;
 
 function isCRLF(char: string) {
     return char === '\n' || char === '\r'
 }
 
 function isWhiteSpace(char: string) {
-    return isCRLF(char) || char === ' ' || char === '\t';
+    return isCRLF(char) || char === ' ' || char === '\t' || char === '\f';
 }
 
 export interface CursorPosition {
@@ -56,7 +78,6 @@ export class Cursor {
     private index: number = -1;
     private line: number = 1;
     private col: number = 0;
-    private _previousPos?: CursorPosition;
 
     constructor(public readonly text: string) {
         this.next();
@@ -74,19 +95,7 @@ export class Cursor {
         }
     }
 
-    previousPos(): CursorPosition {
-        if (this._previousPos) {
-            return this._previousPos;
-        }
-        return { 
-            index: 0,
-            line: 1,
-            col: 1,
-        }
-    }
-
     next() {
-        this._previousPos = this.currentPos();
         this.index++;
         let c = this.currentChar();
         if (isCRLF(c)) {
@@ -117,6 +126,10 @@ export class Cursor {
         return this.isEndOfText() || isCRLF(this.currentChar());
     }
 
+    isWhiteSpace() {
+        return !this.isEndOfText() && isWhiteSpace(this.currentChar());
+    }
+
     skipWhiteSpace() {
         const from = this.currentPos();
         while (!this.isEndOfText() && isWhiteSpace(this.currentChar())) {
@@ -139,49 +152,54 @@ export class Cursor {
             str: this.text.slice(from.index, this.index),
         };    
     }
+
+    ensureCurrentChar(c: string) {
+        if (this.currentChar() !== c) {
+            throw new LispSyntaxException(`Expected current char to be '${c}'`);
+        }        
+    }
+}
+
+const allowedEscapedChars: any = {
+    'b': '\b',
+    'f': '\f',
+    'r': '\r',
+    'n': '\n',
+    't': '\t',
+    'v': '\v',
+    '"': '"',
+    '\\': '\\',
+}
+
+function extractEscapedChar(cursor: Cursor, mapChar: boolean) {
+    cursor.ensureCurrentChar('\\');
+    const escapedChar = cursor.next();
+    if (escapedChar === undefined || cursor.isEndOfLine()) {
+        throw new LispSyntaxException('Expected character after escape char');
+    }
+    if (mapChar) {
+        const result = allowedEscapedChars[escapedChar];
+        if (!result) {
+            throw new LispSyntaxException(`Unrecognized escaped char '${escapedChar}' at position ${cursor.currentPos().toString()}`);
+        }
+        return result;
+    }
+    return escapedChar;
 }
 
 function extractString(cursor: Cursor) {
     const from = cursor.currentPos();
-    if (cursor.currentChar() === '"') {
-        cursor.next();
-    } else {
-        throw new LispSyntaxException('Expected string to start with a double quote');
-    }
+    cursor.ensureCurrentChar('"');
+    cursor.next();
     let str = '';
     while (!cursor.isEndOfText()) {
         const c = cursor.currentChar();
         if (c === '"') {
             const to = cursor.currentPos();
             cursor.next();
-            return {
-                from,
-                to,
-                str,
-            };        
-        } else if (isCRLF(c)) {
-            throw new LispSyntaxException('Unterminated string');
+            return { from, to, str };   
         } else if (c === '\\') {
-            const escapedChar = cursor.next();
-            if (escapedChar === undefined || cursor.isEndOfLine()) {
-                throw new LispSyntaxException('Expected character after escape char');
-            }            
-            switch(escapedChar) {
-            case '\\':
-                str += '\\'
-                break;
-            case '"':
-                str += '"'
-                break;
-            case 'n':
-                str += '\n'
-                break;            
-            case 't':
-                str += '\t'
-                break;
-            default:
-                throw new LispSyntaxException(`Unexpected escaped char: ${escapedChar}`)
-            }
+            str += extractEscapedChar(cursor, true);
         } else {
             str += c;
         }
@@ -190,80 +208,81 @@ function extractString(cursor: Cursor) {
     throw new LispUnterminatedExpressionException('Unterminated string');
 }
 
-function extractQuotedIdentifier(cursor: Cursor) {
-    const from = cursor.currentPos();
-    if (cursor.currentChar() === '|') {
-        cursor.next();
-    } else {
-        throw new LispSyntaxException('Expected text to start with a pipe char');
+interface AtomParsingState { 
+    type: 'integer' | 'float' | 'symbol';
+    isSigned: boolean;
+    hasExponent: boolean;
+    hasSignedExponent: boolean;
+}
+
+function evalNextAtomState(c: string, str: string, state: AtomParsingState) {
+    // sniff the type of the atom:
+    // while it conforms to a number, detect wether it is an integer or a float.
+    // Otherwise make it a symbol.
+
+    if (state.type === 'symbol') {
+        return;
     }
-    let str = '';
-    while (!cursor.isEndOfText()) {
-        const c = cursor.currentChar();
-        if (c === '|') {
-            const to = cursor.currentPos();
-            cursor.next();
-            return {
-                from,
-                to,
-                str,
-            };        
-        } else if (isCRLF(c)) {
-            throw new LispSyntaxException('Unterminated identifier');
-        } else if (c === '\\') {
-            str += c;
-            const escapedChar = cursor.next();
-            if (escapedChar === undefined || cursor.isEndOfLine()) {
-                throw new LispSyntaxException('Expected character after escape char');
-            }            
-            str += escapedChar;
+    if (c === '-' || c === '+') {
+        if (state.hasExponent) {
+            if (state.hasSignedExponent) {
+                state.type = 'symbol';
+            } else {
+                state.hasSignedExponent = true;
+            }
         } else {
-            str += c;
+            if (state.isSigned || str.length > 0) {
+                state.type = 'symbol';
+            } else {
+                state.isSigned = true;
+            }    
         }
-        cursor.next();
+    } else if (c === '.') {
+        if (state.type === 'float') {
+            state.type = 'symbol';
+        } else {
+            state.type = 'float';
+        }
+    } else if (c === 'e' || c === 'E') {
+        if (state.hasExponent) {
+            state.type = 'symbol';
+        } else {
+            state.type = 'float';
+            state.hasExponent = true;
+        }
+    } else if (!'0123456789'.includes(c)) {
+        state.type = 'symbol';
     }
-    throw new LispUnterminatedExpressionException('Unterminated identifier');
 }
 
 // http://www.lispworks.com/documentation/HyperSpec/Body/02_cd.htm
 
 function extractAtom(cursor: Cursor) {
     const from = cursor.currentPos();
+    let to = from;
+    let state: AtomParsingState = { type: 'integer', isSigned: false, hasExponent: false, hasSignedExponent: false};
     let str = '';
     while (true) {
         const c = cursor.currentChar();
-        if (cursor.isEndOfText() || ['(', ')', '"', "'", ' ', '\n', '\t', '\r'].includes(c)) {
+        if (cursor.isEndOfText() || cursor.isWhiteSpace() || "()'\"".includes(c)) {
             if (str.length === 0) {
-                throw new LispUnterminatedExpressionException('Unterminated expression');
+                throw new LispUnterminatedExpressionException('Missing expression');
+            } else if (str === '.' || str === '-' || str === '+' || str === 'e' || str === 'E') {
+                state.type = 'symbol';
             }
-            const to = cursor.previousPos();
-            return {
-                from,
-                to,
-                str,
-            };
+            return { from, to, str, type: state.type };
         } else if (c === '\\') { 
-            str += c;
-            const escapedChar = cursor.next();
-            if (escapedChar === undefined || cursor.isEndOfLine()) {
-                throw new LispSyntaxException('Expected character after escape char');
-            }            
-            // inject escaped char
-            str += escapedChar;
+            state.type = 'symbol';
+            str += extractEscapedChar(cursor, false);
+            to = cursor.currentPos();
             cursor.next();
-        } else if (c === '|') {
-            const res = extractQuotedIdentifier(cursor);
-            str += res.str;
         } else {
+            evalNextAtomState(c, str, state);
             str += c;
+            to = cursor.currentPos();
             cursor.next();
         }
     }
-}
-
-function isNumber(text: string) {
-    const re = /^[+-]?\d+([.]\d*)?$/gm;
-    return re.test(text)
 }
 
 export function* tokenize(text: string) : Generator<Token> {
@@ -276,20 +295,24 @@ export function* tokenize(text: string) : Generator<Token> {
         } else if (c === ';') {
             const { str, from, to } = cursor.skipToEndOfLine();
             yield { type: 'comment', value: str, from, to }
-        } else if (['(', ')', '.', "'"].includes(c)) {
+        } else if (c === '(') {
             const from = cursor.currentPos();
             cursor.next();
-            yield { type: 'symbol', value: c, from, to: from }
+            yield { type: 'lpar', value: c, from, to: from }
+        } else if (c === ')') {
+            const from = cursor.currentPos();
+            cursor.next();
+            yield { type: 'rpar', value: c, from, to: from }
+        } else if (c === "'") {
+            const from = cursor.currentPos();
+            cursor.next();
+            yield { type: 'quote', value: c, from, to: from }
         } else if (c === '"') {
             const { str, from, to } = extractString(cursor);
             yield { type: 'string', value: str, from, to }
         } else {
-            const { str, from, to } = extractAtom(cursor);
-            if (isNumber(str)) {
-                yield { type: 'number', value: str, from, to }
-            } else {
-                yield { type: 'identifier', value: str, from, to }
-            }
+            const { str, type, from, to } = extractAtom(cursor);
+            yield { type, value: str, from, to }
         }        
     }
 }

@@ -39,6 +39,6 @@ describe('Cons', () => {
     test('(1 3.14 "abc def" T nil foo |foo bar|)', () => {
         expect(Cons.fromArray([
             new IntegerAtom(1), new FloatAtom(3.14), new StringAtom('abc def'), new BooleanAtom(true), new BooleanAtom(false), new SymbolAtom('foo'), new SymbolAtom('foo bar'),
-        ]).toString()).toBe('(1 3.14 "abc def" T nil foo |foo bar|)');
+        ]).toString()).toBe('(1 3.14 "abc def" T nil foo foo\\ bar)');
     });    
 });

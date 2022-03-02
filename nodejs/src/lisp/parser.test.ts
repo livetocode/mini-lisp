@@ -1,6 +1,20 @@
 import { LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 import { parse } from "./parser";
-import { Cons, FloatAtom, IntegerAtom, Nil, StringAtom, SymbolAtom } from "./types";
+import { Cons, Expr, FloatAtom, IntegerAtom, Nil, StringAtom, SymbolAtom } from "./types";
+
+function getCdr(expr: Expr) {
+    if (expr instanceof Cons) {
+        return expr.cdr;
+    }
+    throw new Error('Expected a Cons expr');
+}
+
+function getCar(expr: Expr) {
+    if (expr instanceof Cons) {
+        return expr.car;
+    }
+    throw new Error('Expected a Cons expr');
+}
 
 describe('parser', () => {
     describe('atoms', () => {
@@ -16,7 +30,8 @@ describe('parser', () => {
             expect((atom as IntegerAtom).getValue()).toBe(123);
         });
         test('quoted integer', () => {
-            const atom = parse("'123");
+            const expr = parse("'123");
+            const atom = getCar(getCdr(expr));
             expect(atom.isNumber()).toBeTruthy();
             expect(atom).toBeInstanceOf(IntegerAtom);
             expect((atom as IntegerAtom).getValue()).toBe(123);
@@ -28,7 +43,8 @@ describe('parser', () => {
             expect((atom as IntegerAtom).getValue()).toBe(123);
         });
         test('quoted positive integer', () => {
-            const atom = parse("'+123");
+            const expr = parse("'+123");
+            const atom = getCar(getCdr(expr));
             expect(atom.isNumber()).toBeTruthy();
             expect(atom).toBeInstanceOf(IntegerAtom);
             expect((atom as IntegerAtom).getValue()).toBe(123);
@@ -44,6 +60,12 @@ describe('parser', () => {
             expect(atom.isNumber()).toBeTruthy();
             expect(atom).toBeInstanceOf(FloatAtom);
             expect((atom as FloatAtom).getValue()).toBe(123.45);
+        });
+        test('float without leading digit', () => {
+            const atom = parse('.45');
+            expect(atom.isNumber()).toBeTruthy();
+            expect(atom).toBeInstanceOf(FloatAtom);
+            expect((atom as FloatAtom).getValue()).toBe(0.45);
         });
         test('positive float', () => {
             const atom = parse('+123.45');
@@ -77,10 +99,19 @@ describe('parser', () => {
             expect(() => parse("'")).toThrow(LispUnterminatedExpressionException);
         });    
         test('assoc without right expression', () => {
-            expect(() => parse('(1 .)')).toThrow(LispSyntaxException);
+            const expr = parse('(1 .)');
+            expect(expr.isCons()).toBeTruthy();
+            expect(expr.isAtom()).toBeFalsy();
+            expect(expr.isNil()).toBeFalsy();
+            expect(expr).toBeInstanceOf(Cons);
+            expect((expr as Cons).toArray()).toEqual([
+                new IntegerAtom(1),
+                new SymbolAtom('.'),
+            ]);
         });    
         describe('symbols', () => {
             const identifiers = [
+                ['\\+1', '+1'],
                 ['a'],
                 ['abc'],
                 ['a.b'],
@@ -89,9 +120,9 @@ describe('parser', () => {
                 ['Abc'],
                 ['abc-def'],
                 ['abc_def'],
-                ['|a b|', 'a b'],
-                ['|a\\|b|', 'a|b'],
-                ['|a\\nb|', 'anb'],
+                ['|a\\ b|', '|a b|'],
+                ['|a\\|b|', '|a|b|'],
+                ['|a\\nb|', '|anb|'],
                 ['+$'],
                 ['1+'],
                 ['file.rel.43'],
@@ -185,9 +216,12 @@ describe('parser', () => {
             expect(expr.isNil()).toBeFalsy();
             expect(expr).toBeInstanceOf(Cons);
             const cons = expr as Cons;
-            expect(cons.car).toEqual(new IntegerAtom(1));
-            expect(cons.cdr).toEqual(new IntegerAtom(2));
-            expect(cons.toArray()).toEqual([new IntegerAtom(1), new IntegerAtom(2)]);
+            expect(getCar(getCdr(cons.car))).toEqual(new IntegerAtom(1));
+            expect(cons.toArray()).toEqual([
+                Cons.fromArray([SymbolAtom.quote, new IntegerAtom(1)]), 
+                SymbolAtom.quote,
+                new IntegerAtom(2), 
+            ]);
         });
         test('single assoc with an initial list', () => {
             const expr = parse('((1 2) . 3)');
@@ -231,27 +265,28 @@ describe('parser', () => {
             expect(() => parse('1)')).toThrow(LispSyntaxException);
         });    
         test('unbalanced list', () => {
-            expect(() => parse('(1 2 (3 4)')).toThrow(LispSyntaxException);
+            expect(() => parse('(1 2 (3 4)')).toThrow(LispUnterminatedExpressionException);
         });    
         test('multiple expressions outside a list are not allowed', () => {
             expect(() => parse('1 2 3')).toThrow(LispSyntaxException);
-            expect(() => parse('(1 2 3')).toThrow(LispSyntaxException);
+            expect(() => parse('(1 2 3')).toThrow(LispUnterminatedExpressionException);
         });    
     });
     describe('print expressions', () => {
         const expressions = [
-            ["'\n(+\n 2 2)\n", '(quote (+ 2 2))'],
+            ["'\n(+\n 2 2)\n", "'(+ 2 2)"],
             ['', 'nil'],
             ['()', 'nil'],
-            ["'()", 'nil'],
+            ["'()", "'nil"],
             ['(+ 2 2)'],
-            ["'(+ 2 2)", '(quote (+ 2 2))'],
-            ["'\n(+\n 2 2)\n", '(quote (+ 2 2))'],
+            ["'(+ 2 2)", "'(+ 2 2)"],
+            ["'\n(+\n 2 2)\n", "'(+ 2 2)"],
             ['(cons "foo" ("bar"))'],
             ['(1 2 |foo bar| 3.14 "abc")'],
             ['(+ 2 (+ 3 3) 4)'],
             ['(+ 2 \n(+ 3 \n3)\n 4)', '(+ 2 (+ 3 3) 4)'],
-            ['(1 2\n3)', '(1 2 3)']
+            ['(1 2\n3)', '(1 2 3)'],
+            ['1 ;comment', '1']
         ];
         for (const [expr, expected] of expressions) {
             test(expr, () => {
