@@ -43,7 +43,7 @@ rl.on('line', (line) => {
                 rl.setPrompt('... ');
             } else {
                 rl.setPrompt(DefaultPrompt);
-                console.error(err);
+                console.error(err.message);
                 lines = [];
             }
         }

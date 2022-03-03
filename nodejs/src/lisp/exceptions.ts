@@ -7,6 +7,12 @@ LispException
         |__ LispSymbolNotFoundException
 */
 
+export interface CursorPosition {
+    filename?: string;
+    index: number;
+    line: number;
+    col: number;
+}
 
 export class LispException extends Error {
 
@@ -25,7 +31,9 @@ export class LispSymbolNotFoundException extends LispRuntimeException {
 }
 
 export class LispSyntaxException extends LispException {
-
+    constructor(public readonly pos: CursorPosition, message: string) {
+        super(`${pos.filename ?? '<STDIN>'}:${pos.line}:${pos.col} - error: ${message}`);
+    }    
 }
 
 export class LispUnterminatedExpressionException extends LispSyntaxException {

@@ -1,4 +1,4 @@
-import { LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
+import { CursorPosition, LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 
 export type SymbolToken = {
     type: 'symbol';
@@ -68,18 +68,12 @@ function isWhiteSpace(char: string) {
     return isCRLF(char) || char === ' ' || char === '\t' || char === '\f';
 }
 
-export interface CursorPosition {
-    index: number;
-    line: number;
-    col: number;
-}
-
 export class Cursor {
     private index: number = -1;
     private line: number = 1;
     private col: number = 0;
 
-    constructor(public readonly text: string) {
+    constructor(public readonly text: string, public readonly filename?: string) {
         this.next();
     }
 
@@ -89,6 +83,7 @@ export class Cursor {
 
     currentPos(): CursorPosition {
         return { 
+            filename: this.filename,
             index: this.index,
             line: this.line,
             col: this.col,
@@ -155,7 +150,7 @@ export class Cursor {
 
     ensureCurrentChar(c: string) {
         if (this.currentChar() !== c) {
-            throw new LispSyntaxException(`Expected current char to be '${c}'`);
+            throw new LispSyntaxException(this.currentPos(), `Expected current char to be '${c}'`);
         }        
     }
 }
@@ -175,12 +170,12 @@ function extractEscapedChar(cursor: Cursor, mapChar: boolean) {
     cursor.ensureCurrentChar('\\');
     const escapedChar = cursor.next();
     if (escapedChar === undefined || cursor.isEndOfLine()) {
-        throw new LispSyntaxException('Expected character after escape char');
+        throw new LispSyntaxException(cursor.currentPos(), 'Expected character after escape char');
     }
     if (mapChar) {
         const result = allowedEscapedChars[escapedChar];
         if (!result) {
-            throw new LispSyntaxException(`Unrecognized escaped char '${escapedChar}' at position ${cursor.currentPos().toString()}`);
+            throw new LispSyntaxException(cursor.currentPos(), `Unrecognized escaped char '${escapedChar}' at position`);
         }
         return result;
     }
@@ -205,7 +200,7 @@ function extractString(cursor: Cursor) {
         }
         cursor.next();
     }
-    throw new LispUnterminatedExpressionException('Unterminated string');
+    throw new LispUnterminatedExpressionException(cursor.currentPos(), 'Unterminated string');
 }
 
 interface AtomParsingState { 
@@ -266,7 +261,7 @@ function extractAtom(cursor: Cursor) {
         const c = cursor.currentChar();
         if (cursor.isEndOfText() || cursor.isWhiteSpace() || "()'\"".includes(c)) {
             if (str.length === 0) {
-                throw new LispUnterminatedExpressionException('Missing expression');
+                throw new LispUnterminatedExpressionException(cursor.currentPos(), 'Missing expression');
             } else if (str === '.' || str === '-' || str === '+' || str === 'e' || str === 'E') {
                 state.type = 'symbol';
             }
@@ -285,8 +280,8 @@ function extractAtom(cursor: Cursor) {
     }
 }
 
-export function* tokenize(text: string) : Generator<Token> {
-    const cursor = new Cursor(text);
+export function* tokenize(text: string, filename?: string) : Generator<Token> {
+    const cursor = new Cursor(text, filename);
     while (!cursor.isEndOfText()) {
         cursor.skipWhiteSpace();
         const c = cursor.currentChar();

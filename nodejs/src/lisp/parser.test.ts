@@ -93,10 +93,10 @@ describe('parser', () => {
             expect(atom.toString()).toBe('"Hello \\"World\\"!\\nA second\\tline"');
         });
         test('multiple expressions without parenthesis should fail', () => {
-            expect(() => parse('1 2 3')).toThrow(LispSyntaxException);
+            expect(() => parse('1 2 3')).toThrow(new LispSyntaxException({index: 0, line: 1, col: 3}, 'Expected to have a single expression'));
         });    
         test('quote without expression', () => {
-            expect(() => parse("'")).toThrow(LispUnterminatedExpressionException);
+            expect(() => parse("'")).toThrow(new LispUnterminatedExpressionException({index: 0, line: 1, col: 1}, 'Missing expression after a quote'));
         });    
         test('assoc without right expression', () => {
             const expr = parse('(1 .)');
@@ -259,17 +259,17 @@ describe('parser', () => {
             expect(first.toArray()).toEqual([new IntegerAtom(1), new IntegerAtom(2), new IntegerAtom(3)]);
         });
         test('no left expr in assoc', () => {
-            expect(() => parse('(. 2)')).toThrow(LispSyntaxException);
+            expect(() => parse('(. 2)')).toThrow(new LispSyntaxException({index: 0, line: 1, col: 5}, 'left expression required for an assoc'));
         });    
         test('closed list without opening parenthesis', () => {
-            expect(() => parse('1)')).toThrow(LispSyntaxException);
+            expect(() => parse('1)')).toThrow(new LispSyntaxException({index: 0, line: 1, col: 2}, 'Found closing parenthesis without matching opening parenthesis'));
         });    
         test('unbalanced list', () => {
-            expect(() => parse('(1 2 (3 4)')).toThrow(LispUnterminatedExpressionException);
+            expect(() => parse('(1 2 (3 4)')).toThrow(new LispUnterminatedExpressionException({index: 0, line: 1, col: 10}, 'Unbalanced list expression'));
         });    
         test('multiple expressions outside a list are not allowed', () => {
-            expect(() => parse('1 2 3')).toThrow(LispSyntaxException);
-            expect(() => parse('(1 2 3')).toThrow(LispUnterminatedExpressionException);
+            expect(() => parse('1 2 3')).toThrow(new LispSyntaxException({index: 0, line: 1, col: 3}, 'Expected to have a single expression'));
+            expect(() => parse('(1 2 3')).toThrow(new LispUnterminatedExpressionException({index: 0, line: 1, col: 6}, 'Unbalanced list expression'));
         });    
     });
     describe('print expressions', () => {
@@ -279,6 +279,8 @@ describe('parser', () => {
             ['()', 'nil'],
             ["'()", "'nil"],
             ['(+ 2 2)'],
+            ["('a'b)", "('a 'b)"],
+            ["('a ' b 3)", "('a 'b 3)"],
             ["'(+ 2 2)", "'(+ 2 2)"],
             ["'\n(+\n 2 2)\n", "'(+ 2 2)"],
             ['(cons "foo" ("bar"))'],

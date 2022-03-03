@@ -33,7 +33,7 @@ export abstract class Expr {
     }
 
     isText(): boolean {
-        return true;
+        return false;
     }
 
     isString(): boolean {
@@ -58,6 +58,14 @@ export abstract class Expr {
 
     isQuote(): boolean {
         return false;
+    }
+
+    getCar(): Expr | null {
+        return null;
+    }
+
+    getCdr(): Expr | null {
+        return null;
     }
 }
 
@@ -128,14 +136,6 @@ export class BooleanAtom extends Atom {
 export abstract class NumberAtom extends Atom {
     override isNumber(): boolean {
         return true;
-    }
-
-    static parse(text: string): NumberAtom {
-        const isInteger = /^[+-]?\d+$/gm;
-        if (isInteger.test(text)) {
-            return new IntegerAtom(parseInt(text, 10));
-        }
-        return new FloatAtom(parseFloat(text));
     }
 }
 
@@ -243,6 +243,15 @@ export class Cons extends Expr {
         return true;
     }
 
+    override getCar(): Expr | null {
+        return this.car;
+    }
+
+    override getCdr(): Expr | null {
+        return this.cdr;
+    }
+
+
     override toString(): string {
         const items: string[] = [];
         let current: Expr = this;
@@ -259,17 +268,23 @@ export class Cons extends Expr {
         return `(${items.join(' ')})`;
     }
 
-    toArray(): Expr[] {
-        const items: Expr[] = []
+    *enumerate() {
         let current: Expr = this;
         while (current && !current.isNil()) {
             if (current instanceof Cons) {
-                items.push(current.car)
+                yield current.car;
                 current = current.cdr;
             } else {
-                items.push(current)
+                yield current;
                 current = Nil.instance;
             }
+        }
+    }
+
+    toArray(): Expr[] {
+        const items: Expr[] = [];
+        for (const item of this.enumerate()) {
+            items.push(item);
         }
         return items;
     }
@@ -289,7 +304,10 @@ export class Cons extends Expr {
 export class QuotedExpr extends Cons {
     override toString(): string {
         if (this.car.isQuote() && this.cdr.isCons()) {
-            return `'${(this.cdr as Cons).car.toString()}`;
+            const quotedExpr = this.getCdr()?.getCar();
+            if (quotedExpr) {
+                return `'${quotedExpr.toString()}`;
+            }
         }
         return super.toString();
     }
