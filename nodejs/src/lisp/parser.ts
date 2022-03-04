@@ -2,6 +2,10 @@ import { CursorPosition, LispException, LispSyntaxException, LispUnterminatedExp
 import { Token, tokenize } from "./tokenizer";
 import { Cons, Expr, FloatAtom, IntegerAtom, Nil, QuotedExpr, StringAtom, SymbolAtom } from "./types";
 
+export interface ParsedExpr {
+    expr: Expr;
+    pos: CursorPosition;
+}
 
 function parseToken(token: Token): Expr {
     switch(token.type) {
@@ -93,7 +97,21 @@ function propagateQuotedExpression(frame: StackFrame, stack: StackFrame[], pos: 
     return frame;
 }
 
-export function parse(text: string, filename?: string) {
+export function parse(text: string, filename?: string): Expr {
+    const results: Expr[] = [];
+    for (const {expr, pos} of parseAll(text, filename)) {
+        if (results.length > 0) {
+            throw new LispSyntaxException(pos, 'Expected to have a single expression');
+        }
+        results.push(expr);
+    }
+    if (results.length === 0) {
+        return Nil.instance;
+    }
+    return results[0];
+}
+
+export function* parseAll(text: string, filename?: string): Generator<ParsedExpr>  {
     const stack: StackFrame[] = []
     let frame = new StackFrame('root');
     let lastPos: CursorPosition = { index: 0, line: 1, col: 1, filename};
@@ -122,6 +140,11 @@ export function parse(text: string, filename?: string) {
             frame.addExpr(expr, lastPos);
             frame = propagateQuotedExpression(frame, stack, lastPos);
         }
+        if (frame.type === 'root' && !frame.isEmpty()) {
+            const expr = frame.toSingleExpr(lastPos);
+            yield { expr, pos: lastPos };
+            frame = new StackFrame('root');
+        }
     }
     if (frame.type === 'quote') {
         throw new LispUnterminatedExpressionException(lastPos, 'Missing expression after a quote');
@@ -129,6 +152,6 @@ export function parse(text: string, filename?: string) {
     if (stack.length > 0) {
         throw new LispUnterminatedExpressionException(lastPos, 'Unbalanced list expression');
     }
-    return frame.toSingleExpr(lastPos);
+    // return frame.toSingleExpr(lastPos);
 }
 
