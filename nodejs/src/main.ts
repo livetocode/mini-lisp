@@ -40,6 +40,10 @@ function REPL() {
         break;
       case '.exit':
         exit(0);
+      case '.break':
+        lines = [];
+        rl.setPrompt(DefaultPrompt);
+        break;
       default:
           lines.push(line);
           try {
