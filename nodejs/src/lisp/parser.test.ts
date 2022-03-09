@@ -1,6 +1,6 @@
 import { LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 import { parse } from "./parser";
-import { Cons, Expr, FloatAtom, IntegerAtom, Nil, StringAtom, SymbolAtom } from "./types";
+import { BooleanAtom, Cons, Expr, FloatAtom, IntegerAtom, Nil, StringAtom, SymbolAtom } from "./types";
 
 function getCdr(expr: Expr) {
     if (expr instanceof Cons) {
@@ -79,6 +79,13 @@ describe('parser', () => {
             expect(atom).toBeInstanceOf(FloatAtom);
             expect((atom as FloatAtom).getValue()).toBe(-123.45);
         });
+        test('boolean t symbol', () => {
+            const atom = parse('t');
+            expect(atom.isBoolean()).toBeTruthy();
+            expect(atom).toBeInstanceOf(BooleanAtom);
+            expect((atom as BooleanAtom).getValue()).toBe(true);
+            expect(atom).toBe(BooleanAtom.True);
+        });
         test('string', () => {
             const atom = parse('"abc"');
             expect(atom.isString()).toBeTruthy();
@@ -147,6 +154,13 @@ describe('parser', () => {
     describe('lists', () => {
         test('empty list', () => {
             const expr = parse('()');
+            expect(expr.isNil()).toBeTruthy();
+            expect(expr.isAtom()).toBeTruthy();
+            expect(expr.isCons()).toBeFalsy();
+            expect(expr).toBeInstanceOf(Nil);
+        });
+        test('nil symbol', () => {
+            const expr = parse('nil');
             expect(expr.isNil()).toBeTruthy();
             expect(expr.isAtom()).toBeTruthy();
             expect(expr.isCons()).toBeFalsy();
@@ -277,6 +291,7 @@ describe('parser', () => {
             ["'\n(+\n 2 2)\n", "'(+ 2 2)"],
             ['', 'nil'],
             ['()', 'nil'],
+            ['nil'],
             ["'()", "'nil"],
             ['(+ 2 2)'],
             ["('a'b)", "('a 'b)"],
@@ -288,7 +303,7 @@ describe('parser', () => {
             ['(+ 2 (+ 3 3) 4)'],
             ['(+ 2 \n(+ 3 \n3)\n 4)', '(+ 2 (+ 3 3) 4)'],
             ['(1 2\n3)', '(1 2 3)'],
-            ['1 ;comment', '1']
+            ['1 ;comment', '1'],
         ];
         for (const [expr, expected] of expressions) {
             test(expr, () => {

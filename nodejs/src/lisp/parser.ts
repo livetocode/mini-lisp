@@ -1,6 +1,6 @@
 import { CursorPosition, LispException, LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 import { Token, tokenize } from "./tokenizer";
-import { Cons, Expr, FloatAtom, IntegerAtom, Nil, QuotedExpr, StringAtom, SymbolAtom } from "./types";
+import { BooleanAtom, Cons, Expr, FloatAtom, IntegerAtom, Nil, QuotedExpr, StringAtom, SymbolAtom } from "./types";
 
 export interface ParsedExpr {
     expr: Expr;
@@ -10,6 +10,12 @@ export interface ParsedExpr {
 function parseToken(token: Token): Expr {
     switch(token.type) {
         case 'symbol':
+            if (token.value === 'nil') {
+                return Nil.instance;
+            }
+            if (token.value === 't') {
+                return BooleanAtom.True;
+            }
             return new SymbolAtom(token.value);
         case 'integer':
             return new IntegerAtom(parseInt(token.value, 10));

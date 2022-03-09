@@ -1,3 +1,28 @@
+# Project
+
+## description
+
+This project implements a simple and limited LISP interpreter. 
+
+This interpreter can be used from the command-line or it could be embedded in any nodejs project, using the LispEngine class.
+
+## Points of interest
+
+- no external dependencies
+- immutable objects as much as possible
+- handwritten scanner and parser
+- extensible
+- rich object model
+- usage of generators
+- code coverage >90%
+
+## Lisp support
+
+- based on common lisp
+- case sensitive
+- single threaded
+- no support for classes
+
 # Installation
 
 `npm i`

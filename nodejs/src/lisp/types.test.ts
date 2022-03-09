@@ -51,7 +51,7 @@ describe('types', () => {
             expect(atom.isString()).toBeFalsy();
             expect(atom.isSymbol()).toBeFalsy();
             expect(atom.isText()).toBeFalsy();
-            expect(atom.toString()).toBe('T');
+            expect(atom.toString()).toBe('t');
             expect(atom.getValue()).toBe(true);
             expect(atom.getCar()).toBeNull();
             expect(atom.getCdr()).toBeNull();
@@ -170,7 +170,7 @@ describe('types', () => {
         test('(1 3.14 "abc def" T nil foo |foo bar|)', () => {
             expect(Cons.fromArray([
                 new IntegerAtom(1), new FloatAtom(3.14), new StringAtom('abc def'), new BooleanAtom(true), new BooleanAtom(false), new SymbolAtom('foo'), new SymbolAtom('foo bar'),
-            ]).toString()).toBe('(1 3.14 "abc def" T nil foo foo\\ bar)');
+            ]).toString()).toBe('(1 3.14 "abc def" t nil foo foo\\ bar)');
         });
         test('getCar1', () => {
             const item1 = new IntegerAtom(1);

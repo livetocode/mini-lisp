@@ -1,7 +1,7 @@
 import { exit } from 'process';
 import { writeFileSync } from 'fs';
 import { createInterface } from 'readline';
-import { LispEngine } from "./lisp/engine";
+import { getBuiltins, LispEngine } from "./lisp/engine";
 import { LispSyntaxException, LispUnterminatedExpressionException } from './lisp/exceptions';
 import { Expr } from './lisp/types';
 
@@ -74,6 +74,22 @@ function save(history: HistoryItem[], args: string[], ) {
   }
 }
 
+function showBuiltins() {
+  const items = getBuiltins().map(x => x.name).sort();
+  for (const item of items) {
+    console.log(item);
+  }
+}
+
+function showSymbols(engine: LispEngine) {
+  const builtins = new Set(getBuiltins().map(x => x.name));
+  for (const key of engine.globals.keys()) {
+    if (!builtins.has(key)) {
+      console.log(key, ':', engine.globals.resolve(key).getType());
+    }
+  }
+}
+
 function REPL() {
   console.log(`Welcome to Mini-Lisp v${version}.`);
   console.log('Type ".help" for more information.');
@@ -115,6 +131,12 @@ function REPL() {
       case '.save':
         save(history, args);
         break;
+      case '.builtins':
+        showBuiltins();
+        break;
+      case '.symbols':
+        showSymbols(engine);
+        break;
       default:
           lines.push(line);
           try {
@@ -150,6 +172,8 @@ function showHelp() {
   console.log('.history  Display history of previous commands');
   console.log('.load     Load Lisp from a file into the REPL session')
   console.log('.save     Save all evaluated commands in this REPL session to a file');
+  console.log('.builtins Displays all builtins symbols or functions');
+  console.log('.symbols  Displays all global symbols that are not builtins');
   console.log('.help     Print this help message'); 
 }
 

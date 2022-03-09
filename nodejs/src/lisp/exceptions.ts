@@ -22,12 +22,18 @@ export class LispRuntimeException extends LispException {
 
 }
 
+export class LispParametersException extends LispRuntimeException {
+
+}
+
 export class LispStackOverflowException extends LispRuntimeException {
 
 }
 
 export class LispSymbolNotFoundException extends LispRuntimeException {
-
+    constructor(public readonly name: string, message: string) {
+        super(message);
+    }
 }
 
 export class LispSyntaxException extends LispException {
