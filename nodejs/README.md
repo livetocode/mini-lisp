@@ -22,6 +22,8 @@ This interpreter can be used from the command-line or it could be embedded in an
 - case sensitive
 - single threaded
 - no support for classes
+- lambda closures
+- no lisp mutation allowed (functional style and will prevent circular references in Rust)
 
 # Installation
 

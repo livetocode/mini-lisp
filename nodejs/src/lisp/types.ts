@@ -5,8 +5,10 @@ Expr
   |   |_QuotedExpr
   |_FunctionExpr
   |   |_BuiltinFunction
-  |   |_LambdaFunction
+  |   |_AnonymousFunction
   |       |_UserFunction
+  |       |_LambdaFunction
+  |       |   |_LambdaClosure
   |_Atom
       |_Nil
       |_NumberAtom
@@ -326,6 +328,7 @@ export class SymbolAtom extends TextAtom {
     }
 
     static quote = new SymbolAtom('quote');
+    static function = new SymbolAtom('function');
 }
 
 // https://en.wikipedia.org/wiki/Cons
@@ -392,8 +395,19 @@ export class Cons extends Expr {
                 yield current.car;
                 current = current.cdr;
             } else {
-                yield current;
-                current = Nil.instance;
+                throw new LispRuntimeException(`Wrong type argument: listp, ${current.toString()}`);
+            }
+        }
+    }
+
+    *asPairs() {
+        for (const pair of this.enumerate()) {
+            if (pair instanceof Cons) {
+                const key = pair.car;
+                if (pair.cdr instanceof Cons) {
+                    const val = pair.cdr.car;
+                    yield [key, val];
+                }
             }
         }
     }
@@ -434,25 +448,83 @@ export class QuotedExpr extends Cons {
     }
 }
 
+export class GetFuncQuotedExpr extends Cons {
+    override toString(): string {
+        if (this.car instanceof SymbolAtom && this.car.getText() === 'function' && this.cdr.isCons()) {
+            const quotedExpr = this.getCdr()?.getCar();
+            if (quotedExpr) {
+                return `#'${quotedExpr.toString()}`;
+            }
+        }
+        return super.toString();
+    }
+
+    static fromExpr(expr: Expr) {
+        return new GetFuncQuotedExpr(SymbolAtom.function, new Cons(expr, Nil.instance));
+    }
+}
+
 export class LispVariable {
+    private value: Expr | undefined;
+    private funcValue: FunctionExpr | undefined;
     constructor(
         public readonly name: string,
-        public readonly value: Expr,
         public readonly isReadOnly: boolean,
-    ) {}
+        value?: Expr,
+        funcValue?: FunctionExpr,
+    ) {
+        this.value = value;
+        this.funcValue = funcValue;
+    }
+    
+    getValue() { return this.value; }
+    
+    getFuncValue() { return this.funcValue; }
+    
+    setValue(value: Expr) {
+        if (this.value && this.isReadOnly) {
+            throw new LispRuntimeException(`'${this.name}' is a constant, may not be used as a variable`);
+        }
+        this.value = value;
+    }
+
+    setFuncValue(funcValue: FunctionExpr) {
+        if (this.funcValue && this.isReadOnly) {
+            throw new LispRuntimeException(`'${this.name}' is a constant, may not be used as a variable`);
+        }
+        this.funcValue = funcValue;
+    }
 }
 
 export class LispVariables {
     private vars;
+    public readonly root: LispVariables;
+    public readonly parent?: LispVariables;
 
-    constructor(vars: LispVariable[], public readonly parent?: LispVariables) {
+    constructor(vars: LispVariable[], parent?: LispVariables, root?: LispVariables) {
         this.vars = new Map<string, LispVariable>(vars.map(v => [v.name, v]));
+        this.parent = parent;
+        if (root) {
+            this.root = root;
+        } else {
+            this.root = parent ?? this;
+            while (this.root.parent) {
+                this.root = this.root.parent;
+            }    
+        }
+    }
+
+    createChildScope(vars: LispVariable[]) {
+        return new LispVariables(vars, this, this.root);
     }
 
     find(name: string): LispVariable | undefined {
         let result = this.vars.get(name);
         if (!result && this.parent) {
             result = this.parent.find(name);
+            if (result) {
+                this.vars.set(name, result);
+            }
         }
         return result;
     }
@@ -465,25 +537,24 @@ export class LispVariables {
         return result;
     }
 
-    resolve(name: string): Expr {
-        return this.get(name).value;
-    }
-
     set(
         name: string,
-        value: Expr,
         isReadOnly: boolean,
+        value?: Expr,
+        funcValue?: FunctionExpr,
     ) {
         let v = this.find(name);
-        if (v && v.isReadOnly) {
-            throw new LispRuntimeException(`cannot modify variable '${name}' because it is readonly`);
-        } 
-        if (!v && this.parent) {
-            this.parent.set(name, value, isReadOnly);
-        } else {
-            v = new LispVariable(name, value, isReadOnly);
-            this.vars.set(name, v);    
+        if (!v) {
+            v = new LispVariable(name, isReadOnly);
+            this.root.vars.set(name, v);
         }
+        if (value) {
+            v.setValue(value);
+        }
+        if (funcValue) {
+            v.setFuncValue(funcValue);
+        }
+        return v;
     }
 
     keys(): string[] {
@@ -510,62 +581,63 @@ export interface FunctionMetadata extends AnonymousFunctionMetadata {
     readonly aliases?: string[];
 }
 
-export type ExprEvaluator = (options: {
-    expr: Expr, 
-    globals: LispVariables,
-    locals: LispVariables,
-}) => Expr;
+export interface IEvaluationStats {
+    readonly evalCount: number;
+    readonly evalSymbolCount: number;
+    readonly evalFunctionCallCount: number;
+    readonly evalNonEvaluableExprCount: number;
+    clone(): IEvaluationStats;
+    diff(other: IEvaluationStats): IEvaluationStats;
+    toList(): Expr;
+    withVerbsosity<T>(callback: () => T): T;
+}
+
+export interface ILispEvaluator {
+    readonly vars: LispVariables;
+    readonly stats: IEvaluationStats;
+    create(vars: LispVariables): ILispEvaluator;
+    createChildScope(vars: LispVariable[]): ILispEvaluator;
+    createNewScope(vars: LispVariable[]): ILispEvaluator;
+    eval(expr: Expr): Expr;
+}
 
 export class FunctionEvaluationContext {
     public readonly func: FunctionExpr;
     public readonly args: Expr[];
-    public readonly globals: LispVariables;
-    public readonly locals: LispVariables;
-    public readonly evaluator: ExprEvaluator;
+    public readonly evaluator: ILispEvaluator;
 
     constructor(
         options: {
             func: FunctionExpr,
             args: Expr[],
-            globals: LispVariables,
-            locals: LispVariables,
-            evaluator: ExprEvaluator,
+            evaluator: ILispEvaluator,
         }
     ) {
         this.func = options.func;
         this.args = options.args;
-        this.globals = options.globals;
-        this.locals = options.locals;
         this.evaluator = options.evaluator;
     }
 
     eval(expr: Expr): Expr {
-        return this.evaluator({expr, globals: this.globals, locals: this.locals });
+        return this.evaluator.eval(expr);
     }
 
     createNewContext(vars: LispVariable[]): FunctionEvaluationContext {
-        const childScope = new LispVariables(vars, this.globals);
         return new FunctionEvaluationContext({
             func: this.func,
             args: this.args, 
-            evaluator: this.evaluator,
-            globals: this.globals,
-            locals: childScope,
+            evaluator: this.evaluator.createNewScope(vars),
         });
     }
 
     createChildContext(vars: LispVariable[]): FunctionEvaluationContext {
-        const childScope = new LispVariables(vars, this.locals);
         return new FunctionEvaluationContext({
             func: this.func,
             args: this.args, 
-            evaluator: this.evaluator,
-            globals: this.globals,
-            locals: childScope,
+            evaluator: this.evaluator.createChildScope(vars),
         });
     }
 }
-
 
 export abstract class FunctionExpr extends Expr {
     constructor(public readonly meta: AnonymousFunctionMetadata) {
@@ -582,13 +654,14 @@ export abstract class FunctionExpr extends Expr {
 
     abstract eval(ctx: FunctionEvaluationContext): Expr;
 
+    abstract getName(): string;
+
     override compareTo(other: Expr): number {
         if (this.equals(other)) {
             return 0;
         }
         return -1;
     }
-
 }
 
 export type BuiltinFunctionCallback = (ctx: FunctionEvaluationContext) => Expr;
@@ -599,7 +672,7 @@ export class BuiltinFunction extends FunctionExpr {
     }
 
     override toString(): string {
-        return `<builtin-function: ${this.meta.name}>`;
+        return `<builtin-function ${this.meta.name}>`;
     }
 
     override getType(): string {
@@ -610,6 +683,10 @@ export class BuiltinFunction extends FunctionExpr {
         return this.callback(ctx);
     }
 
+    override getName(): string {
+        return this.meta.name;
+    }
+
     override equals(other: Expr): boolean {
         if (other instanceof BuiltinFunction) {
             return this.callback === other.callback;
@@ -618,13 +695,9 @@ export class BuiltinFunction extends FunctionExpr {
     }
 }
 
-export class LambdaFunction extends FunctionExpr {
+export abstract class AnonymousFunction extends FunctionExpr {
     constructor(meta: AnonymousFunctionMetadata, public readonly body: Expr[]) {
         super(meta);
-    }
-
-    toString(): string {
-        return `<lambda>`;
     }
 
     override getType(): string {
@@ -633,12 +706,16 @@ export class LambdaFunction extends FunctionExpr {
 
     override eval(ctx: FunctionEvaluationContext): Expr {
         const args = buildArgVariables(this.meta.args, ctx.args);
-        const funcCtx = ctx.createNewContext(args);
+        const funcCtx = this.createInvocationContext(ctx, args);
         let lastExpr: Expr = Nil.instance;
         for (const expr of this.body) {
             lastExpr = funcCtx.eval(expr);
         }
         return lastExpr;
+    }
+
+    override toString(): string {
+        return `<function :${this.getName()} ${this.argsDefinitionAsString()} ${this.bodyAsString()}>`;
     }
 
     override equals(other: Expr): boolean {
@@ -654,16 +731,67 @@ export class LambdaFunction extends FunctionExpr {
         }   
         return false;
     }
+
+    protected createInvocationContext(ctx: FunctionEvaluationContext, args: LispVariable[]) {
+        return ctx.createNewContext(args);
+    }
+
+    protected argsDefinitionAsString() {
+        const args = this.meta.args.map(x => x.name).join(' ');
+        if (args) {
+            return `(${args})`;
+        }
+        return 'nil';
+    }
+    protected bodyAsString() {
+        return this.body.map(x => x.toString()).join(' ');
+    }
 }
 
-export class UserFunction extends LambdaFunction {
+export class UserFunction extends AnonymousFunction {
     constructor(public readonly meta: FunctionMetadata, public readonly body: Expr[]) {
         super(meta, body);
     }
 
-    toString(): string {
-        return `<function: ${this.meta.name}>`;
+    override getName(): string {
+        return this.meta.name;
     }
+}
+
+export class LambdaFunction extends AnonymousFunction {
+
+    override getName(): string {
+        return 'lambda';
+    }
+}
+
+// See http://www.lispworks.com/documentation/HyperSpec/Body/03_ad.htm for closures and lexical binding
+// Note that a LambdaClosure is created from the (function ...) call.
+
+export class LambdaClosure extends LambdaFunction {
+    constructor(public readonly func: LambdaFunction, public readonly vars: LispVariables) {
+        super(func.meta, func.body);
+    }
+    
+    equals(other: Expr): boolean {
+        if (other instanceof LambdaClosure) {
+            return this === other;
+        }
+        if (other instanceof LambdaFunction) {
+            return this.func.equals(other)
+        }
+        return false;
+    }
+
+    protected override createInvocationContext(ctx: FunctionEvaluationContext, args: LispVariable[]) {
+        const bindingContext = new FunctionEvaluationContext({
+            func: this.func,
+            args: ctx.args, 
+            evaluator: ctx.evaluator.create(this.vars),
+        });
+        return bindingContext.createChildContext(args);
+    }
+
 }
 
 function buildArgVariables(definitions: FunctionArgDefinition[], values: Expr[]) {
@@ -678,7 +806,7 @@ function buildArgVariables(definitions: FunctionArgDefinition[], values: Expr[])
         const def = definitions[i];
         const val = values[i];
         if (def && val) {
-            vars.push(new LispVariable(def.name, val, false));
+            vars.push(new LispVariable(def.name, false, val));
         }
     }
     return vars;

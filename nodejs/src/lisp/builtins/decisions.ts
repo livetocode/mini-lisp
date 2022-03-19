@@ -14,7 +14,7 @@ export const _if = new BuiltinFunction(
         if (ctx.args.length < 2) {
             throw new LispParametersException(`Too few arguments to if`)
         }
-        const cond = ctx.eval(ctx.args[0] ?? Nil.instance);
+        const cond = ctx.eval(ctx.args[0]);
         const expr = (cond.isTrue() ? ctx.args[1] : ctx.args[2]) ?? Nil.instance;
         return ctx.eval(expr);
     },

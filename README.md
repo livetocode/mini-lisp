@@ -8,6 +8,8 @@ This will allow me to learn non trivial concepts of the Rust language, especiall
 
 At the same time, building an interpreter is also a good exercice to sharpen my programming skills.
 
+Finally, I plan to try generating a Web assembly from Rust and try the interpreter in a browser.
+
 # Projects
 
 ## NodeJS with Typescript

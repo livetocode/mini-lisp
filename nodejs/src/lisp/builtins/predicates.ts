@@ -1,8 +1,8 @@
 import { LispParametersException } from "../exceptions";
-import { BuiltinFunction, ExprType, BooleanAtom, Expr, FloatAtom, IntegerAtom, NumberAtom } from "../types";
+import { BuiltinFunction, ExprType, BooleanAtom, Expr, FloatAtom, IntegerAtom, NumberAtom, FunctionEvaluationContext } from "../types";
+import { toSymbol } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_predicates.htm
-
 
 export const eq = new BuiltinFunction(
     {
@@ -50,7 +50,7 @@ export const eql = new BuiltinFunction(
     },
 );
 
-function makePredicate(name: string, predicate: (expr: Expr) => boolean) {
+function makePredicate(name: string, predicate: (expr: Expr, ctx: FunctionEvaluationContext) => boolean) {
     return new BuiltinFunction(
         {
             name,
@@ -64,8 +64,8 @@ function makePredicate(name: string, predicate: (expr: Expr) => boolean) {
             if (ctx.args.length !== 1) {
                 throw new LispParametersException(`expected 1 argument`);
             }
-            const result = predicate(ctx.args[0]);
-            return new BooleanAtom(result);
+            const result = predicate(ctx.args[0], ctx);
+            return result ? BooleanAtom.True : BooleanAtom.False;
         },
     );
 }
@@ -92,4 +92,8 @@ export const floatp = makePredicate('floatp', expr => expr instanceof FloatAtom)
 
 export const stringp = makePredicate('stringp', expr => expr.isString());
 
+export const boundp = makePredicate('boundp', (expr, ctx) => !!ctx.evaluator.vars.find(toSymbol(expr))?.getValue());
 
+export const fboundp = makePredicate('fboundp', (expr, ctx) => !!ctx.evaluator.vars.find(toSymbol(expr))?.getFuncValue());
+
+export const constantp = makePredicate('constantp', (expr, ctx) => ctx.evaluator.vars.find(toSymbol(expr))?.isReadOnly ?? false);

@@ -24,7 +24,7 @@ export const defconstant = new BuiltinFunction(
         }
         const expr = ctx.args[1];
         const value = ctx.eval(expr);
-        ctx.locals.set(name.getValue(), value, true);
-        return expr;
+        ctx.evaluator.vars.set(name.getValue(), true, value);
+        return name;
     },
 );

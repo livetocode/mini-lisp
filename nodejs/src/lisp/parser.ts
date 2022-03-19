@@ -1,6 +1,6 @@
 import { CursorPosition, LispException, LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 import { Token, tokenize } from "./tokenizer";
-import { BooleanAtom, Cons, Expr, FloatAtom, IntegerAtom, Nil, QuotedExpr, StringAtom, SymbolAtom } from "./types";
+import { BooleanAtom, Cons, Expr, FloatAtom, GetFuncQuotedExpr, IntegerAtom, Nil, QuotedExpr, StringAtom, SymbolAtom } from "./types";
 
 export interface ParsedExpr {
     expr: Expr;
@@ -35,7 +35,7 @@ function isSymbol(expr: Expr, symbol: string) {
     return false;
 }
 
-type StackFrameType = 'root' | 'list' | 'quote';
+type StackFrameType = 'root' | 'list' | 'quote' | 'getfunc';
 
 class StackFrame {
     private readonly expressions: Array<Expr> = [];
@@ -53,6 +53,9 @@ class StackFrame {
         if (this.type === 'quote' && !this.isEmpty()) {
             throw new LispSyntaxException(pos, 'Expected to have a single quoted expression');
         }
+        if (this.type === 'getfunc' && !this.isEmpty()) {
+            throw new LispSyntaxException(pos, 'Expected to have a single expression');
+        }
         this.expressions.push(expr);
     }
 
@@ -63,6 +66,8 @@ class StackFrame {
             return this.expressions[0];
         } else if (this.type === 'quote') {
             throw new LispUnterminatedExpressionException(pos, 'Missing expression after a quote');
+        } else if (this.type === 'getfunc') {
+            throw new LispUnterminatedExpressionException(pos, 'Missing expression after a #');
         }
         return Nil.instance;
     }
@@ -88,9 +93,12 @@ class StackFrame {
     }    
 }
 
-function propagateQuotedExpression(frame: StackFrame, stack: StackFrame[], pos: CursorPosition) {
-    while (frame.type === 'quote') {
-        const expr = QuotedExpr.fromExpr(frame.toSingleExpr(pos));
+function propagateLastExpression(frame: StackFrame, stack: StackFrame[], pos: CursorPosition) {
+    while (frame.type === 'quote' || frame.type === 'getfunc') {
+        const transform: (expr: Expr) => Expr = frame.type === 'getfunc' ?  
+            GetFuncQuotedExpr.fromExpr : 
+            QuotedExpr.fromExpr;
+        const expr = transform(frame.toSingleExpr(pos));
 
         const previousFrame = stack.pop();
         if (previousFrame) {
@@ -134,17 +142,20 @@ export function* parseAll(text: string, filename?: string): Generator<ParsedExpr
             if (previousFrame) {
                 frame = previousFrame;
                 frame.addExpr(list, lastPos);
-                frame = propagateQuotedExpression(frame, stack, lastPos);
+                frame = propagateLastExpression(frame, stack, lastPos);
             } else {
                 throw new LispSyntaxException(token.to, 'Found closing parenthesis without matching opening parenthesis');
             }
         } else if (token.type === 'quote') {
             stack.push(frame);
             frame = new StackFrame('quote');
+        } else if (token.type === 'getfunc') {
+            stack.push(frame);
+            frame = new StackFrame('getfunc');
         } else {
             const expr = parseToken(token);
             frame.addExpr(expr, lastPos);
-            frame = propagateQuotedExpression(frame, stack, lastPos);
+            frame = propagateLastExpression(frame, stack, lastPos);
         }
         if (frame.type === 'root' && !frame.isEmpty()) {
             const expr = frame.toSingleExpr(lastPos);
@@ -155,9 +166,11 @@ export function* parseAll(text: string, filename?: string): Generator<ParsedExpr
     if (frame.type === 'quote') {
         throw new LispUnterminatedExpressionException(lastPos, 'Missing expression after a quote');
     }
+    if (frame.type === 'getfunc') {
+        throw new LispUnterminatedExpressionException(lastPos, 'Missing expression after a getfunc');
+    }
     if (stack.length > 0) {
         throw new LispUnterminatedExpressionException(lastPos, 'Unbalanced list expression');
     }
-    // return frame.toSingleExpr(lastPos);
 }
 

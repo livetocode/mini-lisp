@@ -1,4 +1,4 @@
-import { LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
+import { LispRuntimeException, LispSyntaxException, LispUnterminatedExpressionException } from "./exceptions";
 import { parse } from "./parser";
 import { BooleanAtom, Cons, Expr, FloatAtom, IntegerAtom, Nil, StringAtom, SymbolAtom } from "./types";
 
@@ -222,7 +222,7 @@ describe('parser', () => {
             const cons = expr as Cons;
             expect(cons.car).toEqual(new IntegerAtom(1));
             expect(cons.cdr).toEqual(new IntegerAtom(2));
-            expect(cons.toArray()).toEqual([new IntegerAtom(1), new IntegerAtom(2)]);
+            expect(() => cons.toArray()).toThrow(LispRuntimeException);
         });
         test('single assoc with quoted values', () => {
             const expr = parse("('1 . '2)");
@@ -231,10 +231,15 @@ describe('parser', () => {
             expect(expr).toBeInstanceOf(Cons);
             const cons = expr as Cons;
             expect(getCar(getCdr(cons.car))).toEqual(new IntegerAtom(1));
-            expect(cons.toArray()).toEqual([
-                Cons.fromArray([SymbolAtom.quote, new IntegerAtom(1)]), 
+            expect(getCar(getCdr(cons.cdr))).toEqual(new IntegerAtom(2));
+            expect(expr.toString()).toBe("('1 quote 2)");
+            expect((expr as Cons).toArray()).toEqual([
+                Cons.fromArray([
+                    SymbolAtom.quote,
+                    new IntegerAtom(1),    
+                ]),
                 SymbolAtom.quote,
-                new IntegerAtom(2), 
+                new IntegerAtom(2),
             ]);
         });
         test('single assoc with an initial list', () => {
@@ -245,7 +250,7 @@ describe('parser', () => {
             const cons = expr as Cons;
             expect(cons.car).toEqual(Cons.fromArray([new IntegerAtom(1), new IntegerAtom(2)]));
             expect(cons.cdr).toEqual(new IntegerAtom(3));
-            expect(cons.toArray()).toEqual([Cons.fromArray([new IntegerAtom(1), new IntegerAtom(2)]), new IntegerAtom(3)]);
+            expect(() => cons.toArray()).toThrow(LispRuntimeException);
         });
         test('list as nested assocs', () => {
             const expr = parse('(1 . (2 . (3 . ())))');
@@ -270,7 +275,7 @@ describe('parser', () => {
             expect(second.car).toEqual(new IntegerAtom(2));
             expect(second.cdr.isCons()).toBeFalsy();
             expect(second.cdr).toEqual(new IntegerAtom(3));
-            expect(first.toArray()).toEqual([new IntegerAtom(1), new IntegerAtom(2), new IntegerAtom(3)]);
+            expect(() => (expr as Cons).toArray()).toThrow(LispRuntimeException);
         });
         test('no left expr in assoc', () => {
             expect(() => parse('(. 2)')).toThrow(new LispSyntaxException({index: 0, line: 1, col: 5}, 'left expression required for an assoc'));

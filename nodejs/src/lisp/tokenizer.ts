@@ -28,6 +28,12 @@ export type QuoteToken = {
     to: CursorPosition;
 }
 
+export type GetFuncToken = {
+    type: 'getfunc';
+    value: string;
+    from: CursorPosition;
+    to: CursorPosition;
+}
 
 export type IntegerToken = {
     type: 'integer';
@@ -58,7 +64,7 @@ export type CommentToken = {
 }
 
 
-export type Token = SymbolToken | IntegerToken | FloatToken | StringToken | CommentToken | LParToken | RParToken | QuoteToken;
+export type Token = SymbolToken | IntegerToken | FloatToken | StringToken | CommentToken | LParToken | RParToken | QuoteToken | GetFuncToken;
 
 function isCRLF(char: string) {
     return char === '\n' || char === '\r'
@@ -302,6 +308,14 @@ export function* tokenize(text: string, filename?: string) : Generator<Token> {
             const from = cursor.currentPos();
             cursor.next();
             yield { type: 'quote', value: c, from, to: from }
+        } else if (c === "#") {
+            const from = cursor.currentPos();
+            cursor.next();
+            if (cursor.currentChar() !== "'") {
+                throw new LispSyntaxException(from, 'Expected a quote after #');
+            }
+            cursor.next();
+            yield { type: 'getfunc', value: c, from, to: cursor.currentPos() }
         } else if (c === '"') {
             const { str, from, to } = extractString(cursor);
             yield { type: 'string', value: str, from, to }

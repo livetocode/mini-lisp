@@ -83,9 +83,19 @@ function showBuiltins() {
 
 function showSymbols(engine: LispEngine) {
   const builtins = new Set(getBuiltins().map(x => x.name));
-  for (const key of engine.globals.keys()) {
+  for (const key of engine.vars.keys()) {
     if (!builtins.has(key)) {
-      console.log(key, ':', engine.globals.resolve(key).getType());
+      const v =  engine.vars.get(key);
+      const types: string[] = [];
+      const val = v.getValue();
+      if (val) {
+        types.push(val.getType());
+      }
+      const func = v.getFuncValue();
+      if (func) {
+        types.push(func.getType());
+      }
+      console.log(key, ':', types.join('|'));
     }
   }
 }

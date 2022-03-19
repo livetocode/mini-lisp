@@ -1,14 +1,8 @@
-import { LispParametersException, LispRuntimeException } from "../exceptions";
+import { LispParametersException } from "../exceptions";
 import { BooleanAtom, BuiltinFunction, Expr, ExprType, Nil, NumberAtom } from "../types";
+import { toNumber } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_operators.htm
-
-function castToNumber(expr: Expr) : number {
-    if (expr instanceof NumberAtom) {
-        return expr.getNumber();
-    }
-    throw new LispRuntimeException(`${expr.toString()} is not a number`);
-}
 
 export const plus = new BuiltinFunction(
     {
@@ -21,7 +15,7 @@ export const plus = new BuiltinFunction(
         if (ctx.args.length < 2) {
             throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : +`);
         }
-        const values = ctx.args.map(arg => castToNumber(arg));
+        const values = ctx.args.map(arg => toNumber(arg));
         const result = values.reduce((a, v) => a + v, 0);
         return NumberAtom.fromNumber(result);
     },
@@ -38,7 +32,7 @@ export const minus = new BuiltinFunction(
         if (ctx.args.length < 2) {
             throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : -`);
         }
-        const values = ctx.args.map(arg => castToNumber(arg));
+        const values = ctx.args.map(arg => toNumber(arg));
         const result = values.slice(1).reduce((a, v) => a - v, values[0]);
         return NumberAtom.fromNumber(result);
     },
@@ -55,7 +49,7 @@ export const multiply = new BuiltinFunction(
         if (ctx.args.length < 2) {
             throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : *`);
         }
-        const values = ctx.args.map(arg => castToNumber(arg));
+        const values = ctx.args.map(arg => toNumber(arg));
         const result = values.reduce((a, v) => a * v, 1);
         return NumberAtom.fromNumber(result);
     },
@@ -72,7 +66,7 @@ export const divide = new BuiltinFunction(
         if (ctx.args.length < 2) {
             throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : /`);
         }
-        const values = ctx.args.map(arg => castToNumber(arg));
+        const values = ctx.args.map(arg => toNumber(arg));
         const result = values.slice(1).reduce((a, v) => a / v, values[0]);
         return NumberAtom.fromNumber(result);
     },
