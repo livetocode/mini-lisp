@@ -1,5 +1,5 @@
 import { LispParametersException } from "../exceptions";
-import { Expr, FunctionExpr, LispVariables, NumberAtom, SymbolAtom } from "../types";
+import { Expr, LispFunction, LispVariables, NumberAtom, SymbolAtom } from "../types";
 
 export function toSymbol(expr: Expr): string {
     if (expr instanceof SymbolAtom) {
@@ -15,7 +15,7 @@ export function toNumber(expr: Expr) : number {
     throw new LispParametersException(`${expr.toString()} is not a number`);
 }
 
-export function getFuncByNameOrObject(expr: Expr, vars: LispVariables, builtinName: string): FunctionExpr {
+export function getFuncByNameOrObject(expr: Expr, vars: LispVariables, builtinName: string): LispFunction {
     if (expr instanceof SymbolAtom) {
         const name = expr.getText();
         const f = vars.find(name)?.getFuncValue();
@@ -24,7 +24,7 @@ export function getFuncByNameOrObject(expr: Expr, vars: LispVariables, builtinNa
         }
         throw new LispParametersException(`Undefined function ${name}`);
     }
-    if (expr instanceof FunctionExpr) {
+    if (expr instanceof LispFunction) {
         return expr;
     }
     throw new LispParametersException(`${builtinName} requires a symbol or function object as first parameter`);

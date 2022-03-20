@@ -1,5 +1,5 @@
 import { LispParametersException } from "../exceptions";
-import { BuiltinFunction, Cons, ExprType, FunctionEvaluationContext, Nil, SymbolAtom } from "../types";
+import { BuiltinFunction, Cons, ExprType, FloatAtom, FunctionEvaluationContext, Nil, SymbolAtom } from "../types";
 import { getFuncByNameOrObject } from "./utils";
 
 export const quote = new BuiltinFunction(
@@ -43,6 +43,7 @@ export const apply = new BuiltinFunction(
             throw new LispParametersException(`apply requires a list as second parameter`);
         }
         return func.eval(new FunctionEvaluationContext({
+            call: ctx.call,
             func,
             args: args.toArray(),
             evaluator: ctx.evaluator,
@@ -64,6 +65,7 @@ export const funcall = new BuiltinFunction(
         const [funcOrName, ...args] = ctx.args;
         const func = getFuncByNameOrObject(funcOrName, ctx.evaluator.vars.root, 'funcall');
         return func.eval(new FunctionEvaluationContext({
+            call: ctx.call,
             func,
             args,
             evaluator: ctx.evaluator,
@@ -130,3 +132,24 @@ export const debugCalls = new BuiltinFunction(
         return ctx.evaluator.stats.withVerbsosity(() => ctx.eval(ctx.args[0]));
     },
 );
+
+export const elapsedTime = new BuiltinFunction(
+    {
+        name: 'elapsed-time',
+        evalArgs: false,
+        args: [],
+        returnType: new ExprType('expr'),
+    },
+    (ctx) => {
+        if (ctx.args.length === 0) {
+            throw new LispParametersException(`Too few arguments to elapsed-time`);
+        }
+        const hrstart = process.hrtime.bigint();
+        const result = ctx.eval(ctx.args[0]);
+        const hrend = process.hrtime.bigint();
+        const elapsedTimeInNanos = hrend - hrstart;
+        const elapsedInMS = Number(elapsedTimeInNanos / BigInt(1000000));
+        return Cons.fromArray([result, new FloatAtom(elapsedInMS)]);
+    },
+);
+

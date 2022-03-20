@@ -3,12 +3,13 @@ Hierarchy:
 Expr
   |_Cons
   |   |_QuotedExpr
-  |_FunctionExpr
+  |   |_GetFuncQuotedExpr
+  |_LispFunction
   |   |_BuiltinFunction
   |   |_AnonymousFunction
   |       |_UserFunction
   |       |_LambdaFunction
-  |       |   |_LambdaClosure
+  |           |_LambdaClosure
   |_Atom
       |_Nil
       |_NumberAtom
@@ -18,6 +19,19 @@ Expr
       |_TextAtom
           |_StringAtom
           |_SymbolAtom
+
+
+LispVariable
+LispVariables
+ExprType
+FunctionArgDefinition
+AnonymousFunctionMetadata
+   |_FunctionMetadata
+IEvaluationStats
+ILispEvaluator
+FunctionEvaluationContext
+
+
 */
 
 import { LispParametersException, LispRuntimeException, LispSymbolNotFoundException } from "./exceptions";
@@ -466,12 +480,12 @@ export class GetFuncQuotedExpr extends Cons {
 
 export class LispVariable {
     private value: Expr | undefined;
-    private funcValue: FunctionExpr | undefined;
+    private funcValue: LispFunction | undefined;
     constructor(
         public readonly name: string,
         public readonly isReadOnly: boolean,
         value?: Expr,
-        funcValue?: FunctionExpr,
+        funcValue?: LispFunction,
     ) {
         this.value = value;
         this.funcValue = funcValue;
@@ -488,7 +502,7 @@ export class LispVariable {
         this.value = value;
     }
 
-    setFuncValue(funcValue: FunctionExpr) {
+    setFuncValue(funcValue: LispFunction) {
         if (this.funcValue && this.isReadOnly) {
             throw new LispRuntimeException(`'${this.name}' is a constant, may not be used as a variable`);
         }
@@ -541,7 +555,7 @@ export class LispVariables {
         name: string,
         isReadOnly: boolean,
         value?: Expr,
-        funcValue?: FunctionExpr,
+        funcValue?: LispFunction,
     ) {
         let v = this.find(name);
         if (!v) {
@@ -602,17 +616,20 @@ export interface ILispEvaluator {
 }
 
 export class FunctionEvaluationContext {
-    public readonly func: FunctionExpr;
+    public readonly call: Cons;
+    public readonly func: LispFunction;
     public readonly args: Expr[];
     public readonly evaluator: ILispEvaluator;
 
     constructor(
         options: {
-            func: FunctionExpr,
+            call: Cons;
+            func: LispFunction,
             args: Expr[],
             evaluator: ILispEvaluator,
         }
     ) {
+        this.call = options.call;
         this.func = options.func;
         this.args = options.args;
         this.evaluator = options.evaluator;
@@ -624,6 +641,7 @@ export class FunctionEvaluationContext {
 
     createNewContext(vars: LispVariable[]): FunctionEvaluationContext {
         return new FunctionEvaluationContext({
+            call: this.call,
             func: this.func,
             args: this.args, 
             evaluator: this.evaluator.createNewScope(vars),
@@ -632,6 +650,7 @@ export class FunctionEvaluationContext {
 
     createChildContext(vars: LispVariable[]): FunctionEvaluationContext {
         return new FunctionEvaluationContext({
+            call: this.call,
             func: this.func,
             args: this.args, 
             evaluator: this.evaluator.createChildScope(vars),
@@ -639,7 +658,7 @@ export class FunctionEvaluationContext {
     }
 }
 
-export abstract class FunctionExpr extends Expr {
+export abstract class LispFunction extends Expr {
     constructor(public readonly meta: AnonymousFunctionMetadata) {
         super();
     }
@@ -666,7 +685,7 @@ export abstract class FunctionExpr extends Expr {
 
 export type BuiltinFunctionCallback = (ctx: FunctionEvaluationContext) => Expr;
 
-export class BuiltinFunction extends FunctionExpr {
+export class BuiltinFunction extends LispFunction {
     constructor(public readonly meta: FunctionMetadata, public readonly callback: BuiltinFunctionCallback) {
         super(meta);
     }
@@ -695,7 +714,7 @@ export class BuiltinFunction extends FunctionExpr {
     }
 }
 
-export abstract class AnonymousFunction extends FunctionExpr {
+export abstract class AnonymousFunction extends LispFunction {
     constructor(meta: AnonymousFunctionMetadata, public readonly body: Expr[]) {
         super(meta);
     }
@@ -785,6 +804,7 @@ export class LambdaClosure extends LambdaFunction {
 
     protected override createInvocationContext(ctx: FunctionEvaluationContext, args: LispVariable[]) {
         const bindingContext = new FunctionEvaluationContext({
+            call: ctx.call,
             func: this.func,
             args: ctx.args, 
             evaluator: ctx.evaluator.create(this.vars),

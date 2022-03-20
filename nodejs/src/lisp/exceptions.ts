@@ -3,6 +3,7 @@ LispException
   |__ LispSyntaxException
   |     |__ LispUnterminatedExpressionException
   |__ LispRuntimeException
+        |__ LispParametersException
         |__ LispStackOverflowException
         |__ LispSymbolNotFoundException
 */

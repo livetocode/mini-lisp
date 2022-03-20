@@ -1,6 +1,9 @@
 import { LispRuntimeException, LispSymbolNotFoundException } from "./exceptions";
-import { Cons, Expr, FunctionEvaluationContext, FunctionExpr, IEvaluationStats, ILispEvaluator, IntegerAtom, LambdaFunction, LispVariable, LispVariables, SymbolAtom } from "./types";
+import { Cons, Expr, FunctionEvaluationContext, LispFunction, IEvaluationStats, ILispEvaluator, IntegerAtom, LambdaFunction, LispVariable, LispVariables, SymbolAtom } from "./types";
 
+function getIndent(depth: number): string {
+    return '  '.repeat(Math.min(20, Math.max(0, depth-1)));
+}
 
 export class EvaluationStats implements IEvaluationStats {
     depth: number = 0;
@@ -108,7 +111,7 @@ export class LispEvaluator implements ILispEvaluator {
         if (nameOrLambda.isCons()) {
             nameOrLambda = this.eval(nameOrLambda);
         }
-        let func: FunctionExpr | undefined;
+        let func: LispFunction | undefined;
         if (nameOrLambda instanceof LambdaFunction) {
             func = nameOrLambda;
         } else if (nameOrLambda instanceof SymbolAtom) {
@@ -134,18 +137,19 @@ export class LispEvaluator implements ILispEvaluator {
             }
         
             const ctx = new FunctionEvaluationContext({
+                call,
                 func,
                 args: argsArray,
                 evaluator: this,
             });
             const shouldLog = this.stats.verboseCounter > 0;
             if (shouldLog) {
-                const indent = '  '.repeat(Math.min(20, this.stats.depth-1));
+                const indent = getIndent(this.stats.depth);
                 console.log(indent, '<<<', nameOrLambda.toString(), ':', Cons.fromArray(argsArray).toString());
             }
             const result = func.eval(ctx);        
             if (shouldLog) {
-                const indent = '  '.repeat(Math.min(20, this.stats.depth-1));
+                const indent = getIndent(this.stats.depth);
                 console.log(indent, '>>>', nameOrLambda.toString(), ':', Cons.fromArray(argsArray).toString(), ' --> ', result.toString());
             }
             return result;    
