@@ -1,5 +1,5 @@
 import { LispEngine } from './engine';
-import { Cons, IntegerAtom, UserFunction } from './types';
+import { Cons, IntegerAtom } from './types';
 
 describe('engine', () => {
     let engine : LispEngine;
@@ -58,7 +58,7 @@ describe('engine', () => {
                 expect(engine.run(`
                     (defun two-funs (x)
                         (list (function (lambda () x))
-                            (function (lambda (y) (setq x y)))))`)).toBeInstanceOf(UserFunction);
+                            (function (lambda (y) (setq x y)))))`).toString()).toBe('two-funs');
                 expect(engine.run('(setq funs (two-funs 6))')).toBeInstanceOf(Cons);
                 expect(engine.run('(funcall (car funs))').toString()).toBe('6');
                 expect(engine.run('(funcall (cadr funs) 43)').toString()).toBe('43');

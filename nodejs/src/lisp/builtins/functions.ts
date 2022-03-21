@@ -26,12 +26,13 @@ export const defun = new BuiltinFunction(
         if (ctx.args.length < 2) {
             throw new LispParametersException(`Too few arguments to defun`)
         }
-        const name = toSymbol(ctx.args[0]);
+        const nameArg = ctx.args[0];
+        const name = toSymbol(nameArg);
         const args = parseArgDeclaration(ctx.args[1]);
         const body = ctx.args.slice(2);
         const f = new UserFunction({name, evalArgs: true, args}, body);
         ctx.evaluator.vars.root.set(f.meta.name, false, undefined, f);
-        return f;
+        return nameArg;
     },
 );
 
