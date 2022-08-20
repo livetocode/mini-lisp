@@ -1,6 +1,6 @@
 import { LispParametersException, LispRuntimeException } from "../exceptions";
 import { Expr, FunctionArgDefinition, Cons, ExprType, BuiltinFunction, UserFunction, LambdaFunction, LambdaClosure } from "../types";
-import { getFuncByNameOrObject, toSymbol } from "./utils";
+import { castArgAsSymbol, getFuncByNameOrObject, toSymbol, validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_functions.htm
 
@@ -23,11 +23,9 @@ export const defun = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 2) {
-            throw new LispParametersException(`Too few arguments to defun`)
-        }
-        const nameArg = ctx.args[0];
-        const name = toSymbol(nameArg);
+        validateArgsLength(ctx, { min: 2 });
+        const nameArg = castArgAsSymbol(ctx, 0);
+        const name = nameArg.getText();
         const args = parseArgDeclaration(ctx.args[1]);
         const body = ctx.args.slice(2);
         const f = new UserFunction({name, evalArgs: true, args}, body);
@@ -44,9 +42,7 @@ export const lambda = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 2) {
-            throw new LispParametersException(`Too few arguments to lambda`)
-        }
+        validateArgsLength(ctx, { min: 2 });
         const args = parseArgDeclaration(ctx.args[0]);
         const body = ctx.args.slice(1);
         const f = new LambdaFunction({evalArgs: true, args}, body);
@@ -62,9 +58,7 @@ export const _function = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 1) {
-            throw new LispParametersException(`Too few arguments to function`)
-        }
+        validateArgsLength(ctx, { min: 1, max: 1 });
         let nameOrFunc = ctx.args[0];
         if (nameOrFunc.isCons()) {
             nameOrFunc = ctx.eval(nameOrFunc);
@@ -85,10 +79,8 @@ export const symbol_function = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 1) {
-            throw new LispParametersException(`Too few arguments to symbol-function`)
-        }
-        const name = toSymbol(ctx.args[0]);
+        validateArgsLength(ctx, { min: 1, max: 1 });
+        const name = castArgAsSymbol(ctx, 0).getText();
         const func = ctx.evaluator.vars.find(name)?.getFuncValue();
         if (!func) {
             throw new LispRuntimeException(`Undefined function ${name}`);

@@ -1,6 +1,5 @@
-import { LispParametersException } from "../exceptions";
 import { BuiltinFunction, Cons, ExprType, FloatAtom, FunctionEvaluationContext, Nil, SymbolAtom } from "../types";
-import { getFuncByNameOrObject } from "./utils";
+import { castArgAsOptionalCons, getFuncByNameOrObject, validateArgsLength } from "./utils";
 
 export const quote = new BuiltinFunction(
     {
@@ -34,18 +33,14 @@ export const apply = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 2) {
-            throw new LispParametersException(`apply requires 2 arguments`);
-        }
-        const [funcOrName, args] = ctx.args;
+        validateArgsLength(ctx, { min: 2, max: 2 });
+        const funcOrName = ctx.args[0];
         const func = getFuncByNameOrObject(funcOrName, ctx.evaluator.vars.root, 'apply');
-        if (!(args instanceof Cons)) {
-            throw new LispParametersException(`apply requires a list as second parameter`);
-        }
+        const args = castArgAsOptionalCons(ctx, 1);
         return func.eval(new FunctionEvaluationContext({
             call: ctx.call,
             func,
-            args: args.toArray(),
+            args: args?.toArray() ?? [],
             evaluator: ctx.evaluator,
         }))
     },
@@ -59,9 +54,7 @@ export const funcall = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length === 0) {
-            throw new LispParametersException(`Too few arguments to funcall`);
-        }
+        validateArgsLength(ctx, { min: 1 });
         const [funcOrName, ...args] = ctx.args;
         const func = getFuncByNameOrObject(funcOrName, ctx.evaluator.vars.root, 'funcall');
         return func.eval(new FunctionEvaluationContext({
@@ -93,9 +86,7 @@ export const typeOf = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length === 0) {
-            throw new LispParametersException(`Too few arguments to type-of`);
-        }
+        validateArgsLength(ctx, { min: 1, max: 1 });
         return new SymbolAtom(ctx.args[0].getType());
     },
 );
@@ -108,9 +99,7 @@ export const debugStats = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length === 0) {
-            throw new LispParametersException(`Too few arguments to debug-stats`);
-        }
+        validateArgsLength(ctx, { min: 1, max: 1 });
         const oldStats = ctx.evaluator.stats.clone();
         const result = ctx.eval(ctx.args[0]);
         const callStats = ctx.evaluator.stats.diff(oldStats);
@@ -126,9 +115,7 @@ export const debugCalls = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length === 0) {
-            throw new LispParametersException(`Too few arguments to debug-calls`);
-        }
+        validateArgsLength(ctx, { min: 1, max: 1 });
         return ctx.evaluator.stats.withVerbsosity(() => ctx.eval(ctx.args[0]));
     },
 );
@@ -141,9 +128,7 @@ export const elapsedTime = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length === 0) {
-            throw new LispParametersException(`Too few arguments to elapsed-time`);
-        }
+        validateArgsLength(ctx, { min: 1, max: 1 });
         const hrstart = process.hrtime.bigint();
         const result = ctx.eval(ctx.args[0]);
         const hrend = process.hrtime.bigint();

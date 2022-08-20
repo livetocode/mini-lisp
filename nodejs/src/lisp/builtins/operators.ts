@@ -1,6 +1,5 @@
-import { LispParametersException } from "../exceptions";
 import { BooleanAtom, BuiltinFunction, Expr, ExprType, Nil, NumberAtom } from "../types";
-import { toNumber } from "./utils";
+import { toNumber, validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_operators.htm
 
@@ -12,9 +11,7 @@ export const plus = new BuiltinFunction(
         returnType: new ExprType('number'),
     },
     (ctx) => {
-        if (ctx.args.length < 2) {
-            throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : +`);
-        }
+        validateArgsLength(ctx, { min: 2 });
         const values = ctx.args.map(arg => toNumber(arg));
         const result = values.reduce((a, v) => a + v, 0);
         return NumberAtom.fromNumber(result);
@@ -29,9 +26,7 @@ export const minus = new BuiltinFunction(
         returnType: new ExprType('number'),
     },
     (ctx) => {
-        if (ctx.args.length < 2) {
-            throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : -`);
-        }
+        validateArgsLength(ctx, { min: 2 });
         const values = ctx.args.map(arg => toNumber(arg));
         const result = values.slice(1).reduce((a, v) => a - v, values[0]);
         return NumberAtom.fromNumber(result);
@@ -46,9 +41,7 @@ export const multiply = new BuiltinFunction(
         returnType: new ExprType('number'),
     },
     (ctx) => {
-        if (ctx.args.length < 2) {
-            throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : *`);
-        }
+        validateArgsLength(ctx, { min: 2 });
         const values = ctx.args.map(arg => toNumber(arg));
         const result = values.reduce((a, v) => a * v, 1);
         return NumberAtom.fromNumber(result);
@@ -63,9 +56,7 @@ export const divide = new BuiltinFunction(
         returnType: new ExprType('number'),
     },
     (ctx) => {
-        if (ctx.args.length < 2) {
-            throw new LispParametersException(`Too few arguments (${ctx.args.length}) instead of at least 2) given to : /`);
-        }
+        validateArgsLength(ctx, { min: 2 });
         const values = ctx.args.map(arg => toNumber(arg));
         const result = values.slice(1).reduce((a, v) => a / v, values[0]);
         return NumberAtom.fromNumber(result);
@@ -85,15 +76,13 @@ function makeBooleanOperator(name: string, aliases: string[], predicate: (a: Exp
             returnType: new ExprType('boolean'),
         },
         (ctx) => {
-            if (ctx.args.length < 2) {
-                throw new LispParametersException(`expected at least 2 arguments`);
-            }
+            validateArgsLength(ctx, { min: 2 });
             for (let i = 1; i < ctx.args.length; i++) {
                 if (!predicate(ctx.args[i-1], ctx.args[i])) {
-                    return new BooleanAtom(false);
+                    return BooleanAtom.False;
                 }
             }
-            return new BooleanAtom(true);
+            return BooleanAtom.True;
         },
     );
 }
@@ -144,9 +133,7 @@ export const not = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 1) {
-            throw new LispParametersException('Expected a single argument');
-        }
+        validateArgsLength(ctx, { min: 1, max: 1 });
         const result = ctx.args[0].isTrue();
         return new BooleanAtom(!result);
     },

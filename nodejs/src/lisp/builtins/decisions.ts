@@ -1,5 +1,5 @@
-import { LispParametersException } from "../exceptions";
 import { BuiltinFunction, ExprType, Nil } from "../types";
+import { validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_decisions.htm
 
@@ -11,9 +11,7 @@ export const _if = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 2) {
-            throw new LispParametersException(`Too few arguments to if`)
-        }
+        validateArgsLength(ctx, { min: 2 });
         const cond = ctx.eval(ctx.args[0]);
         const expr = (cond.isTrue() ? ctx.args[1] : ctx.args[2]) ?? Nil.instance;
         return ctx.eval(expr);

@@ -1,6 +1,6 @@
 import { LispParametersException, LispRuntimeException } from "../exceptions";
-import { BuiltinFunction, ExprType, SymbolAtom, Nil, Expr, Cons, LispVariable } from "../types";
-import { toSymbol } from "./utils";
+import { BuiltinFunction, ExprType, SymbolAtom, Nil, Expr, LispVariable } from "../types";
+import { castArgAsCons, castArgAsSymbol, toSymbol, validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_variables.htm
 
@@ -12,13 +12,8 @@ export const set = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 2) {
-            throw new LispParametersException(`expected 2 arguments but received ${ctx.args.length}`);
-        }
-        const name = ctx.args[0];
-        if (!(name instanceof SymbolAtom)) {
-            throw new LispParametersException(`Expected arg #0 to be a symbol but received ${name.getType()}`);
-        }
+        validateArgsLength(ctx, { min: 2, max: 2 });
+        const name = castArgAsSymbol(ctx, 0);
         const expr = ctx.args[1];
         ctx.evaluator.vars.set(name.getValue(), false, expr);
         return expr;
@@ -33,15 +28,10 @@ export const setq = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length % 2 !== 0) {
-            throw new LispParametersException(`odd number of arguments: ${ctx.args.toString()}`)
-        }
+        validateArgsLength(ctx, { min: 2, isEven: true });
         let lastExpr: Expr = Nil.instance;
         for (let i = 0; i < ctx.args.length; i += 2) {
-            const name = ctx.args[i];
-            if (!(name instanceof SymbolAtom)) {
-                throw new LispParametersException(`Expected arg #${i} to be a symbol but received ${name.getType()}`);
-            }
+            const name = castArgAsSymbol(ctx, i);
             const expr = ctx.args[i + 1];
             const value = ctx.eval(expr);
             ctx.evaluator.vars.set(name.getValue(), false, value);
@@ -59,13 +49,8 @@ export const defvar = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length === 0) {
-            throw new LispParametersException(`expected at least one argument`);
-        }
-        const name = ctx.args[0];
-        if (!(name instanceof SymbolAtom)) {
-            throw new LispParametersException(`Expected arg #0 to be a symbol but received ${name.getType()}`);
-        }
+        validateArgsLength(ctx, { min: 1, max: 2 });
+        const name = castArgAsSymbol(ctx, 0);
         if (ctx.args.length > 1) {
             const expr = ctx.args[1];
             const value = ctx.eval(expr);
@@ -86,13 +71,8 @@ export const defparameter = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length === 0) {
-            throw new LispParametersException(`expected at least one argument`);
-        }
-        const name = ctx.args[0];
-        if (!(name instanceof SymbolAtom)) {
-            throw new LispParametersException(`Expected arg #0 to be a symbol but received ${name.getType()}`);
-        }
+        validateArgsLength(ctx, { min: 1, max: 2 });
+        const name = castArgAsSymbol(ctx, 0);
         if (ctx.args.length > 1) {
             const expr = ctx.args[1];
             const value = ctx.eval(expr);
@@ -110,9 +90,7 @@ export const symbol_value = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 1) {
-            throw new LispParametersException(`Too few arguments to symbol-value`)
-        }
+        validateArgsLength(ctx, { min: 1, max: 1 });
         const name = toSymbol(ctx.args[0]);
         const val = ctx.evaluator.vars.find(name)?.getValue();
         if (!val) {
@@ -130,13 +108,9 @@ export const _let = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 1) {
-            throw new LispParametersException(`Too few arguments to let`)
-        }
-        const [varList, ...body] = ctx.args;
-        if (!(varList instanceof Cons)) {
-            throw new LispParametersException('Expected first argument to be a list');
-        }
+        validateArgsLength(ctx, { min: 1 });
+        const varList = castArgAsCons(ctx, 0);
+        const body = ctx.args.slice(1);
         const vars : LispVariable[] = [];
         for (const [k, v] of varList.asPairs()) {
             if (!(k instanceof SymbolAtom)) {

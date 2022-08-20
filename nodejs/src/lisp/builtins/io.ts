@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
-import { LispParametersException } from "../exceptions";
 import { parseAll } from '../parser';
-import { BuiltinFunction, Expr, ExprType, Nil, StringAtom } from "../types";
+import { BuiltinFunction, Expr, ExprType, Nil } from "../types";
+import { castArgAsString, validateArgsLength } from './utils';
 
 export const print = new BuiltinFunction(
     {
@@ -24,16 +24,11 @@ export const _import = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 1) {
-            throw new LispParametersException(`expected 1 argument`);
-        }
-        if (!(ctx.args[0] instanceof StringAtom)) {
-            throw new LispParametersException(`expected first argument to be a string`);
-        }
-        const filename = ctx.args[0].getText();
-        const script = readFileSync(filename, {encoding: 'utf8'});
+        validateArgsLength(ctx, { min: 1, max: 1 });
+        const filename = castArgAsString(ctx, 0);
+        const script = readFileSync(filename.getText(), {encoding: 'utf8'});
         let lastExpr: Expr | undefined;
-        for (const item of parseAll(script, filename)) {
+        for (const item of parseAll(script, filename.getText())) {
             lastExpr = ctx.eval(item.expr);
         }
         return lastExpr ?? Nil.instance;

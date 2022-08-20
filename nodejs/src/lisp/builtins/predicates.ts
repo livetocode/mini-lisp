@@ -70,7 +70,7 @@ function makePredicate(name: string, predicate: (expr: Expr, ctx: FunctionEvalua
     );
 }
 
-export const atom = makePredicate('atom', expr => expr.isAtom());
+export const atom = makePredicate('atom', expr => expr.isAtom() || expr.isNil());
 
 export const evenp = makePredicate('evenp', expr => expr instanceof NumberAtom && expr.getNumber() % 2 === 0);
 

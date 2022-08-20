@@ -1,5 +1,5 @@
-import { LispParametersException } from "../exceptions";
 import { BuiltinFunction, ExprType, Cons, Nil, Expr } from "../types";
+import { castArgAsOptionalCons, getSingleArgAsList, toList, validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_lists.htm
 
@@ -23,10 +23,9 @@ export const _cons = new BuiltinFunction(
         returnType: new ExprType('cons'),
     },
     (ctx) => {
-        if (ctx.args.length !== 2) {
-            throw new LispParametersException(`expected 2 arguments`);
-        }
-        return new Cons(ctx.args[0] ?? Nil.instance, ctx.args[1] ?? Nil.instance);
+        validateArgsLength(ctx, { min: 2, max: 2});
+        const [a, b] = ctx.args;
+        return new Cons(a, b);
     },
 );
 
@@ -64,17 +63,8 @@ export const cadr = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 1) {
-            throw new LispParametersException(`expected 1 argument`);
-        }
-        const [list] = ctx.args;
-        if (list.isNil()) {
-            return list;
-        }
-        if (!list.isCons()) {
-            throw new LispParametersException(`expected a list as argument`);
-        }
-        return list.getCdr()?.getCar() ?? Nil.instance;
+        const list = getSingleArgAsList(ctx);
+        return list?.getCdr()?.getCar() ?? Nil.instance;
     },
 );
 
@@ -87,17 +77,8 @@ export const caddr = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 1) {
-            throw new LispParametersException(`expected 1 argument`);
-        }
-        const [list] = ctx.args;
-        if (list.isNil()) {
-            return list;
-        }
-        if (!list.isCons()) {
-            throw new LispParametersException(`expected a list as argument`);
-        }
-        return list.getCdr()?.getCdr()?.getCar() ?? Nil.instance;
+        const list = getSingleArgAsList(ctx);
+        return list?.getCdr()?.getCdr()?.getCar() ?? Nil.instance;
     },
 );
 
@@ -110,17 +91,8 @@ export const cadddr = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 1) {
-            throw new LispParametersException(`expected 1 argument`);
-        }
-        const [list] = ctx.args;
-        if (list.isNil()) {
-            return list;
-        }
-        if (!list.isCons()) {
-            throw new LispParametersException(`expected a list as argument`);
-        }
-        return list.getCdr()?.getCdr()?.getCdr()?.getCar() ?? Nil.instance;
+        const list = getSingleArgAsList(ctx);
+        return list?.getCdr()?.getCdr()?.getCdr()?.getCar() ?? Nil.instance;
     },
 );
 
@@ -132,32 +104,14 @@ export const last = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 1) {
-            throw new LispParametersException(`expected 1 argument`);
-        }
-        if (ctx.args[0].isNil()) {
-            return ctx.args[0];
-        }
-        if (!ctx.args[0].isCons()) {
-            throw new LispParametersException(`expected a list as argument`);
-        }
-        let current: Expr | null = ctx.args[0];
+        const list = getSingleArgAsList(ctx);
+        let current: Expr | null = list;
         while (current && current.getCdr()?.isCons()) {
             current = current.getCdr();
         }
         return current ?? Nil.instance;
     },
 );
-
-function castToList(expr: Expr) {
-    if (expr.isNil()) {
-        return [];
-    }
-    if (expr instanceof Cons) {
-        return expr.toArray();
-    }
-    throw new LispParametersException(`Expected '${expr.toString()}' to be a list`);
-}
 
 export const append = new BuiltinFunction(
     {
@@ -167,7 +121,7 @@ export const append = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        const args = ctx.args.flatMap(castToList);
+        const args = ctx.args.flatMap(toList);
         return Cons.fromArray(args);
     },
 );
@@ -180,7 +134,7 @@ export const reverse = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        const args = ctx.args.flatMap(castToList).reverse();
+        const args = ctx.args.flatMap(toList).reverse();
         return Cons.fromArray(args);
     },
 );
@@ -193,17 +147,9 @@ export const member = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length !== 2) {
-            throw new LispParametersException(`expected 2 arguments`);
-        }
-        const [a, b] = ctx.args;
-        if (b.isNil()) {
-            return b;
-        }
-        if (!b.isCons()) {
-            throw new LispParametersException(`expected a list as argument`);
-        }
-        let current: Expr | null = b;
+        validateArgsLength(ctx, { min: 2, max: 2});
+        const a = ctx.args[0];
+        let current: Expr | null = castArgAsOptionalCons(ctx, 1);
         while (current) {
             if (current.getCar()?.equals(a)) {
                 return current;
@@ -222,15 +168,12 @@ export const sort = new BuiltinFunction(
         returnType: new ExprType('expr'),
     },
     (ctx) => {
-        if (ctx.args.length < 1) {
-            throw new LispParametersException(`too few arguments`);
-        }
-        const list = ctx.args[0];
-        if (!(list instanceof Cons)) {
-            throw new LispParametersException('Expected first argument to be a list');
+        const list = getSingleArgAsList(ctx);
+        if (list === null) {
+            return Nil.instance;
         }
         // TODO: add support for a custom comparer as second argument
         const comparer = (a: Expr, b: Expr) => a.compareTo(b);
-        return Cons.fromArray(list.toArray().sort(comparer));
+        return Cons.fromArray(list.toArray().sort(comparer));        
     },
 );
