@@ -117,7 +117,8 @@ export const _let = new BuiltinFunction(
                 throw new LispParametersException('Expected each variable declaration to start with a symbol for the name');
             }
             const name = k.getText();
-            vars.push(new LispVariable(name, false, v));
+            const value = ctx.eval(v);
+            vars.push(new LispVariable(name, false, value));
         }
         const childContext = ctx.createChildContext(vars);
         const bodyVals = body.map(e => childContext.eval(e));

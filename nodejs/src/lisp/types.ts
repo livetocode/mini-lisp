@@ -421,6 +421,10 @@ export class Cons extends Expr {
                 if (pair.cdr instanceof Cons) {
                     const val = pair.cdr.car;
                     yield [key, val];
+                } else if (pair.cdr.isNil()) {
+                    yield [key, pair.cdr];
+                } else {
+                    throw new LispRuntimeException(`A list of pairs should be a list of lists, where each nested list has two items, but received pair: ${pair.toString()}`);
                 }
             }
         }
