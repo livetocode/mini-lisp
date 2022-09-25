@@ -284,11 +284,11 @@ describe('parser', () => {
             expect(() => parse('1)')).toThrow(new LispSyntaxException({index: 0, line: 1, col: 2}, 'Found closing parenthesis without matching opening parenthesis'));
         });    
         test('unbalanced list', () => {
-            expect(() => parse('(1 2 (3 4)')).toThrow(new LispUnterminatedExpressionException({index: 0, line: 1, col: 10}, 'Unbalanced list expression'));
+            expect(() => parse('(1 2 (3 4)')).toThrow(new LispUnterminatedExpressionException({index: 0, line: 1, col: 1}, 'Unbalanced list expression'));
         });    
         test('multiple expressions outside a list are not allowed', () => {
             expect(() => parse('1 2 3')).toThrow(new LispSyntaxException({index: 0, line: 1, col: 3}, 'Expected to have a single expression'));
-            expect(() => parse('(1 2 3')).toThrow(new LispUnterminatedExpressionException({index: 0, line: 1, col: 6}, 'Unbalanced list expression'));
+            expect(() => parse('(1 2 3')).toThrow(new LispUnterminatedExpressionException({index: 0, line: 1, col: 1}, 'Unbalanced list expression'));
         });    
     });
     describe('print expressions', () => {
