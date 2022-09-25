@@ -1,54 +1,7 @@
-import { LispParametersException } from "../exceptions";
 import { BuiltinFunction, ExprType, BooleanAtom, Expr, FloatAtom, IntegerAtom, NumberAtom, FunctionEvaluationContext } from "../types";
-import { toSymbol } from "./utils";
+import { toSymbol, validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_predicates.htm
-
-export const eq = new BuiltinFunction(
-    {
-        name: 'eq',
-        evalArgs: true,
-        args: [
-            { name: 'a', type: new ExprType('any') },
-            { name: 'b', type: new ExprType('any') },
-        ],
-        returnType: new ExprType('boolean'),
-    },
-    (ctx) => {
-        if (ctx.args.length !== 2) {
-            throw new LispParametersException(`expected 2 arguments`);
-        }
-        // pointer equals?
-        const result = ctx.args[0] === ctx.args[1];
-        return new BooleanAtom(result);
-    },
-);
-
-export const eql = new BuiltinFunction(
-    {
-        name: 'eql',
-        evalArgs: true,
-        args: [
-            { name: 'a', type: new ExprType('any') },
-            { name: 'b', type: new ExprType('any') },
-        ],
-        returnType: new ExprType('boolean'),
-    },
-    (ctx) => {
-        if (ctx.args.length !== 2) {
-            throw new LispParametersException(`expected 2 arguments`);
-        }
-        const [a, b] = ctx.args;
-        // compare only numbers and symbols, of the same type
-        if (a.isNumber() && a.getType() === b.getType()) {
-            return new BooleanAtom(a.equals(b));
-        }
-        if (a.isSymbol() && a.getType() === b.getType()) {
-            return new BooleanAtom(a.equals(b));
-        }
-        return new BooleanAtom(false);
-    },
-);
 
 function makePredicate(name: string, predicate: (expr: Expr, ctx: FunctionEvaluationContext) => boolean) {
     return new BuiltinFunction(
@@ -61,9 +14,7 @@ function makePredicate(name: string, predicate: (expr: Expr, ctx: FunctionEvalua
             returnType: new ExprType('boolean'),
         },
         (ctx) => {
-            if (ctx.args.length !== 1) {
-                throw new LispParametersException(`expected 1 argument`);
-            }
+            validateArgsLength(ctx, { min: 1, max: 1 });
             const result = predicate(ctx.args[0], ctx);
             return result ? BooleanAtom.True : BooleanAtom.False;
         },

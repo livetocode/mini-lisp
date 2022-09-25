@@ -1,3 +1,4 @@
+import { LispParametersException } from "../exceptions";
 import { BooleanAtom, BuiltinFunction, Expr, ExprType, Nil, NumberAtom } from "../types";
 import { toNumber, validateArgsLength } from "./utils";
 
@@ -11,7 +12,6 @@ export const plus = new BuiltinFunction(
         returnType: new ExprType('number'),
     },
     (ctx) => {
-        validateArgsLength(ctx, { min: 2 });
         const values = ctx.args.map(arg => toNumber(arg));
         const result = values.reduce((a, v) => a + v, 0);
         return NumberAtom.fromNumber(result);
@@ -41,7 +41,6 @@ export const multiply = new BuiltinFunction(
         returnType: new ExprType('number'),
     },
     (ctx) => {
-        validateArgsLength(ctx, { min: 2 });
         const values = ctx.args.map(arg => toNumber(arg));
         const result = values.reduce((a, v) => a * v, 1);
         return NumberAtom.fromNumber(result);
@@ -87,17 +86,67 @@ function makeBooleanOperator(name: string, aliases: string[], predicate: (a: Exp
     );
 }
 
-export const equal = makeBooleanOperator('=', ['equal'], (a, b) => a.equals(b));
+function ensureNumbers(a: Expr, b: Expr) {
+    if (!a.isNumber()) {
+        throw new LispParametersException(`${a.toString()} is not a number`);
+    }
+    if (!b.isNumber()) {
+        throw new LispParametersException(`${b.toString()} is not a number`);
+    }
+    return true;
+}
 
-export const different = makeBooleanOperator('/=', [], (a, b) => !a.equals(b));
+function ensureStrings(a: Expr, b: Expr) {
+    if (!a.isString()) {
+        throw new LispParametersException(`${a.toString()} is not a string`);
+    }
+    if (!b.isString()) {
+        throw new LispParametersException(`${b.toString()} is not a string`);
+    }
+    return true;
+}
 
-export const greater = makeBooleanOperator('>', ['greaterp'], (a, b) => a.compareTo(b) > 0);
+function sameNumbersOrSymbols(a: Expr, b: Expr) {
+    if (a === b) {
+        return true;
+    }
+    if (a.getType() === b.getType()) {
+        if (a.isNumber() || a.isSymbol()) {
+            return a.equals(b);
+        }
+    }
+    return false;
+}
 
-export const greaterOrEqual = makeBooleanOperator('>=', [], (a, b) => a.compareTo(b) >= 0);
+export const eq = makeBooleanOperator('eq', [], (a, b) => a === b);
 
-export const less = makeBooleanOperator('<', ['lessp'], (a, b) => a.compareTo(b) < 0);
+export const eql = makeBooleanOperator('eql', [], (a, b) => sameNumbersOrSymbols(a, b));
 
-export const lessOrEqual = makeBooleanOperator('<=', [], (a, b) => a.compareTo(b) <= 0);
+export const equal = makeBooleanOperator('equal', [], (a, b) => a.equals(b));
+
+export const _equal = makeBooleanOperator('=', [], (a, b) => ensureNumbers(a, b) && a.equals(b));
+
+export const _different = makeBooleanOperator('/=', [], (a, b) => ensureNumbers(a, b) && !a.equals(b));
+
+export const _greater = makeBooleanOperator('>', [], (a, b) => ensureNumbers(a, b) && a.compareTo(b) > 0);
+
+export const _greaterOrEqual = makeBooleanOperator('>=', [], (a, b) => ensureNumbers(a, b) && a.compareTo(b) >= 0);
+
+export const _less = makeBooleanOperator('<', [], (a, b) => ensureNumbers(a, b) && a.compareTo(b) < 0);
+
+export const _lessOrEqual = makeBooleanOperator('<=', [], (a, b) => ensureNumbers(a, b) && a.compareTo(b) <= 0);
+
+export const _strEqual = makeBooleanOperator('string=', [], (a, b) => ensureStrings(a, b) && a.equals(b));
+
+export const _strDifferent = makeBooleanOperator('string/=', [], (a, b) => ensureStrings(a, b) && !a.equals(b));
+
+export const _strGreater = makeBooleanOperator('string>', [], (a, b) => ensureStrings(a, b) && a.compareTo(b) > 0);
+
+export const _strGeaterOrEqual = makeBooleanOperator('string>=', [], (a, b) => ensureStrings(a, b) && a.compareTo(b) >= 0);
+
+export const _strLess = makeBooleanOperator('string<', [], (a, b) => ensureStrings(a, b) && a.compareTo(b) < 0);
+
+export const _strLessOrEqual = makeBooleanOperator('string<=', [], (a, b) => ensureStrings(a, b) && a.compareTo(b) <= 0);
 
 export const and = new BuiltinFunction(
     {
