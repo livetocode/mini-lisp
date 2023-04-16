@@ -375,6 +375,7 @@ export class Cons extends Expr {
     }
 
     override compareTo(other: Expr): number {
+        // TODO: do a comparison between items of both lists
         if (this.equals(other)) {
             return 0;
         }
@@ -449,6 +450,8 @@ export class Cons extends Expr {
         return result;
     }
 }
+
+export type List = Cons | Nil;
 
 export class QuotedExpr extends Cons {
     override toString(): string {
@@ -586,6 +589,7 @@ export class ExprType {
 export interface FunctionArgDefinition {
     readonly name: string;
     readonly type: ExprType;
+    readonly isVariadic?: boolean;
 }
 
 export interface AnonymousFunctionMetadata {
@@ -685,6 +689,7 @@ export abstract class LispFunction extends Expr {
         }
         return -1;
     }
+
 }
 
 export type BuiltinFunctionCallback = (ctx: FunctionEvaluationContext) => Expr;
@@ -695,7 +700,8 @@ export class BuiltinFunction extends LispFunction {
     }
 
     override toString(): string {
-        return `<builtin-function ${this.meta.name}>`;
+        // return `<builtin-function ${this.meta.name}>`;
+        return `<builtin-function :${this.getName()} ${this.argsDefinitionAsString()} -> ${this.meta.returnType?.name ?? 'Expr'}>`;
     }
 
     override getType(): string {
@@ -715,6 +721,14 @@ export class BuiltinFunction extends LispFunction {
             return this.callback === other.callback;
         }   
         return false;
+    }
+
+    protected argsDefinitionAsString(): string {
+        const args = this.meta.args.map(x => `${x.isVariadic ? '...': ''}${x.name}: ${x.type.name}${x.isVariadic ? '[]' : ''}`).join(', ');
+        if (args) {
+            return `(${args})`;
+        }
+        return '()';
     }
 }
 
@@ -759,13 +773,14 @@ export abstract class AnonymousFunction extends LispFunction {
         return ctx.createNewContext(args);
     }
 
-    protected argsDefinitionAsString() {
+    protected argsDefinitionAsString(): string {
         const args = this.meta.args.map(x => x.name).join(' ');
         if (args) {
             return `(${args})`;
         }
         return 'nil';
     }
+
     protected bodyAsString() {
         return this.body.map(x => x.toString()).join(' ');
     }
@@ -835,4 +850,18 @@ function buildArgVariables(definitions: FunctionArgDefinition[], values: Expr[])
     }
     return vars;
 }
+
+export const tExpr = new ExprType('expr');
+export const tNil = new ExprType('nil');
+export const tCons = new ExprType('cons');
+export const tList = new ExprType('cons | nil');
+export const tNumber = new ExprType('number');
+export const tInteger = new ExprType('integer');
+export const tFloat = new ExprType('float');
+export const tBoolean = new ExprType('boolean');
+export const tAtom = new ExprType('atom');
+export const tText = new ExprType('text');
+export const tSymbol = new ExprType('symbol');
+export const tString = new ExprType('string');
+export const tFunction = new ExprType('function');
 

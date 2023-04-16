@@ -1,4 +1,4 @@
-import { BuiltinFunction, ExprType, Cons, Nil, Expr } from "../types";
+import { BuiltinFunction, Cons, Nil, Expr, tCons, tExpr, tList } from "../types";
 import { castArgAsOptionalCons, getSingleArgAsList, toList, validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_lists.htm
@@ -7,8 +7,8 @@ export const list = new BuiltinFunction(
     {
         name: 'list',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('cons'),
+        args: [{ name: 'items', type: tExpr, isVariadic: true }],
+        returnType: tCons,
     },
     (ctx) => {
         return Cons.fromArray(ctx.args);
@@ -19,8 +19,11 @@ export const _cons = new BuiltinFunction(
     {
         name: 'cons',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('cons'),
+        args: [
+            { name: 'a', type: tExpr },
+            { name: 'b', type: tExpr },
+        ],
+        returnType: tCons,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 2, max: 2});
@@ -34,8 +37,8 @@ export const car = new BuiltinFunction(
         name: 'car',
         aliases: ['first'],
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tExpr,
     },
     (ctx) => {
         return ctx.args[0]?.getCar() ?? Nil.instance;
@@ -46,8 +49,8 @@ export const cdr = new BuiltinFunction(
     {
         name: 'cdr',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tExpr,
     },
     (ctx) => {
         return ctx.args[0]?.getCdr() ?? Nil.instance;
@@ -59,8 +62,8 @@ export const cadr = new BuiltinFunction(
         name: 'cadr',
         aliases: ['second'],
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tExpr,
     },
     (ctx) => {
         const list = getSingleArgAsList(ctx);
@@ -73,8 +76,8 @@ export const caddr = new BuiltinFunction(
         name: 'caddr',
         aliases: ['third'],
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tExpr,
     },
     (ctx) => {
         const list = getSingleArgAsList(ctx);
@@ -87,8 +90,8 @@ export const cadddr = new BuiltinFunction(
         name: 'cadddr',
         aliases: ['fourth'],
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tExpr,
     },
     (ctx) => {
         const list = getSingleArgAsList(ctx);
@@ -100,8 +103,8 @@ export const last = new BuiltinFunction(
     {
         name: 'last',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tExpr,
     },
     (ctx) => {
         const list = getSingleArgAsList(ctx);
@@ -117,8 +120,8 @@ export const append = new BuiltinFunction(
     {
         name: 'append',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'items', type: tExpr, isVariadic: true }],
+        returnType: tList,
     },
     (ctx) => {
         const args = ctx.args.flatMap(toList);
@@ -130,12 +133,15 @@ export const reverse = new BuiltinFunction(
     {
         name: 'reverse',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tList,
     },
     (ctx) => {
-        const args = ctx.args.flatMap(toList).reverse();
-        return Cons.fromArray(args);
+        const list = getSingleArgAsList(ctx);
+        if (list === null) {
+            return Nil.instance;
+        }
+        return Cons.fromArray(list.toArray().reverse());
     },
 );
 
@@ -143,8 +149,11 @@ export const member = new BuiltinFunction(
     {
         name: 'member',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [
+            { name: 'item', type: tExpr },
+            { name: 'list', type: tList },
+        ],
+        returnType: tList,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 2, max: 2});
@@ -164,8 +173,8 @@ export const sort = new BuiltinFunction(
     {
         name: 'sort',
         evalArgs: true,
-        args: [],
-        returnType: new ExprType('expr'),
+        args: [{ name: 'list', type: tList }],
+        returnType: tList,
     },
     (ctx) => {
         const list = getSingleArgAsList(ctx);

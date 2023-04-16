@@ -1,5 +1,5 @@
 import { LispParametersException, LispRuntimeException } from "../exceptions";
-import { BuiltinFunction, ExprType, SymbolAtom, Nil, Expr, LispVariable } from "../types";
+import { BuiltinFunction, SymbolAtom, Nil, Expr, LispVariable, tExpr } from "../types";
 import { castArgAsCons, castArgAsSymbol, toSymbol, validateArgsLength } from "./utils";
 
 // https://www.tutorialspoint.com/lisp/lisp_variables.htm
@@ -9,7 +9,7 @@ export const set = new BuiltinFunction(
         name: 'set',
         evalArgs: true,
         args: [],
-        returnType: new ExprType('expr'),
+        returnType: tExpr,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 2, max: 2 });
@@ -25,7 +25,7 @@ export const setq = new BuiltinFunction(
         name: 'setq',
         evalArgs: false,
         args: [],
-        returnType: new ExprType('expr'),
+        returnType: tExpr,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 2, isEven: true });
@@ -46,7 +46,7 @@ export const defvar = new BuiltinFunction(
         name: 'defvar',
         evalArgs: false,
         args: [],
-        returnType: new ExprType('expr'),
+        returnType: tExpr,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 1, max: 2 });
@@ -68,7 +68,7 @@ export const defparameter = new BuiltinFunction(
         name: 'defparameter',
         evalArgs: false,
         args: [],
-        returnType: new ExprType('expr'),
+        returnType: tExpr,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 1, max: 2 });
@@ -87,7 +87,7 @@ export const symbol_value = new BuiltinFunction(
         name: 'symbol-value',
         evalArgs: true,
         args: [],
-        returnType: new ExprType('expr'),
+        returnType: tExpr,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 1, max: 1 });
@@ -105,7 +105,7 @@ export const _let = new BuiltinFunction(
         name: 'let',
         evalArgs: false,
         args: [],
-        returnType: new ExprType('expr'),
+        returnType: tExpr,
     },
     (ctx) => {
         validateArgsLength(ctx, { min: 1 });
