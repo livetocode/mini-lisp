@@ -6,6 +6,7 @@ export * from './decisions';
 export * from './functions';
 export * from './io';
 export * from './lists';
+export * from './zlists';
 export * from './operators';
 export * from './predicates';
 export * from './variables';
